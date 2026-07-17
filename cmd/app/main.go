@@ -10,13 +10,38 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/postgres"
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	// Load .env file
+	if err := godotenv.Load(); err != nil {
+		log.Println("file .env not found, using system env vars")
+	}
+
+	// Connecting to db
+	dbUrl := postgres.GetPostgresDSN()
+	config := postgres.PoolConfig{
+		MaxConns:          25,
+		MinConns:          10,
+		MaxConnIdleTime:   2 * time.Minute,
+		MaxConnLifetime:   5 * time.Minute,
+		HealthCheckPeriod: 30 * time.Second,
+	}
+
+	pool, err := postgres.NewPool(dbUrl, config)
+	if err != nil {
+		log.Fatalf("Failed to connect: %v", err)
+	}
+	defer pool.Close()
+	log.Println("Connected to PostgreSQL successfully")
+
 	// Wiring
 	r := chi.NewRouter()
-	r.Get("/health", healthHandler())
+	r.Get("/health", healthHandler(pool))
 
 	// Server setup
 	srv := http.Server{
@@ -48,14 +73,23 @@ func main() {
 	log.Println("server stopped cleanly")
 }
 
-func healthHandler() http.HandlerFunc {
+func healthHandler(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		status := "ok"
+		postgresStatus := "healthy"
+		if err := db.Ping(r.Context()); err != nil {
+			postgresStatus = "unhealthy"
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]any{
-			"service":   "pinterest-clone-api",
-			"status":    "ok",
+			"status":    status,
 			"timestamp": time.Now().UTC().Format(time.RFC3339),
+			"services": map[string]string{
+				"pinterest-clone-api": "ok",
+				"PostgreSQL":          postgresStatus,
+			},
 		})
 	}
 }
