@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ArtemYarin/pinterest-clone-api/pkg/postgres"
+	"github.com/ArtemYarin/pinterest-clone-api/internal/postgres"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"

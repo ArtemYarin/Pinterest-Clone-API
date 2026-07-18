@@ -6,7 +6,7 @@ import (
 
 	"github.com/ArtemYarin/pinterest-clone-api/internal/app/auth/password"
 	"github.com/ArtemYarin/pinterest-clone-api/internal/app/auth/validation"
-	"github.com/ArtemYarin/pinterest-clone-api/pkg/jwt"
+	"github.com/ArtemYarin/pinterest-clone-api/internal/jwt"
 	"github.com/go-playground/validator/v10"
 )
 
