@@ -8,9 +8,9 @@ import (
 )
 
 type UserRepository interface {
-	CreateUser(ctx context.Context, user CredentialsUserRequest) (*UserCreatedResponse, error)
-	GetUserByEmail(ctx context.Context, email string) (*UserDataResponse, error)
-	GetUserByID(ctx context.Context, id string) (*UserDataResponse, error)
+	CreateUser(ctx context.Context, user CredentialsUserRequest) (*UserResponse, error)
+	GetUserByEmail(ctx context.Context, email string) (*UserWithPasswordResponse, error)
+	GetUserByID(ctx context.Context, id string) (*UserWithPasswordResponse, error)
 	UpdateUser(ctx context.Context, user UpdateUserRequest) error
 }
 
@@ -22,8 +22,8 @@ func NewUserRepository(db *pgxpool.Pool) UserRepository {
 	return &userRepository{db: db}
 }
 
-func (r *userRepository) CreateUser(ctx context.Context, user CredentialsUserRequest) (*UserCreatedResponse, error) {
-	var u UserCreatedResponse
+func (r *userRepository) CreateUser(ctx context.Context, user CredentialsUserRequest) (*UserResponse, error) {
+	var u UserResponse
 	err := r.db.QueryRow(ctx,
 		"INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id, email, created_at, updated_at",
 		user.Email, user.Password_hash).
@@ -34,8 +34,8 @@ func (r *userRepository) CreateUser(ctx context.Context, user CredentialsUserReq
 	return &u, nil
 }
 
-func (r *userRepository) GetUserByEmail(ctx context.Context, email string) (*UserDataResponse, error) {
-	var u UserDataResponse
+func (r *userRepository) GetUserByEmail(ctx context.Context, email string) (*UserWithPasswordResponse, error) {
+	var u UserWithPasswordResponse
 	err := r.db.QueryRow(ctx,
 		"SELECT id, email, password_hash, created_at, updated_at FROM users WHERE email = $1", email).
 		Scan(&u.Id, &u.Email, &u.Password_hash, &u.Created_at, &u.Updated_at)
@@ -45,8 +45,8 @@ func (r *userRepository) GetUserByEmail(ctx context.Context, email string) (*Use
 	return &u, nil
 }
 
-func (r *userRepository) GetUserByID(ctx context.Context, id string) (*UserDataResponse, error) {
-	var u UserDataResponse
+func (r *userRepository) GetUserByID(ctx context.Context, id string) (*UserWithPasswordResponse, error) {
+	var u UserWithPasswordResponse
 	err := r.db.QueryRow(ctx,
 		"SELECT id, email, password_hash, created_at, updated_at FROM users WHERE id = $1", id).
 		Scan(&u.Id, &u.Email, &u.Password_hash, &u.Created_at, &u.Updated_at)

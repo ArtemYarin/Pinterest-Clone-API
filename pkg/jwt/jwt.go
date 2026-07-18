@@ -6,21 +6,24 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 var secretKey = []byte(os.Getenv("JWT_SECRET"))
 
 type Claims struct {
-	UserID int `json:"user_id"`
+	UserID uuid.UUID `json:"user_id"`
 	jwt.RegisteredClaims
 }
 
-func GenerateToken(userID int) (string, error) {
+func GenerateToken(userID uuid.UUID) (string, error) {
 	claims := Claims{
 		UserID: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Issuer:    "pinterest-clone-api",
+			ID:        uuid.NewString(),
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
