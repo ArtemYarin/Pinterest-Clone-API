@@ -10,7 +10,7 @@ import (
 type UserRepository interface {
 	CreateUser(ctx context.Context, user CredentialsUserRequest) (*UserResponse, error)
 	GetUserByEmail(ctx context.Context, email string) (*UserWithPasswordResponse, error)
-	GetUserByID(ctx context.Context, id string) (*UserWithPasswordResponse, error)
+	GetUserByID(ctx context.Context, id string) (*UserResponse, error)
 	UpdateUser(ctx context.Context, user UpdateUserRequest) error
 }
 
@@ -45,11 +45,11 @@ func (r *userRepository) GetUserByEmail(ctx context.Context, email string) (*Use
 	return &u, nil
 }
 
-func (r *userRepository) GetUserByID(ctx context.Context, id string) (*UserWithPasswordResponse, error) {
-	var u UserWithPasswordResponse
+func (r *userRepository) GetUserByID(ctx context.Context, id string) (*UserResponse, error) {
+	var u UserResponse
 	err := r.db.QueryRow(ctx,
-		"SELECT id, email, password_hash, created_at, updated_at FROM users WHERE id = $1", id).
-		Scan(&u.Id, &u.Email, &u.Password_hash, &u.Created_at, &u.Updated_at)
+		"SELECT id, email, created_at, updated_at FROM users WHERE id = $1", id).
+		Scan(&u.Id, &u.Email, &u.Created_at, &u.Updated_at)
 	if err != nil {
 		return nil, err
 	}

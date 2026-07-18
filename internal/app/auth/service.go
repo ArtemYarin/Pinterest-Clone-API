@@ -13,8 +13,8 @@ import (
 type UserService interface {
 	RegisterUser(ctx context.Context, user CredentialsUserRequest) (*UserWithTokenResponse, error)
 	LoginUser(ctx context.Context, user CredentialsUserRequest) (string, error)
-	GetUserByEmail(ctx context.Context, email string) (*UserWithPasswordResponse, error)
-	GetUserByID(ctx context.Context, id string) (*UserWithPasswordResponse, error)
+	GetUserByEmail(ctx context.Context, email string) (*UserResponse, error)
+	GetUserByID(ctx context.Context, id string) (*UserResponse, error)
 	UpdateUser(ctx context.Context, user UpdateUserRequest) error
 }
 
@@ -92,15 +92,24 @@ func (s *userService) LoginUser(ctx context.Context, user CredentialsUserRequest
 	return token, nil
 }
 
-func (s *userService) GetUserByEmail(ctx context.Context, email string) (*UserWithPasswordResponse, error) {
+func (s *userService) GetUserByEmail(ctx context.Context, email string) (*UserResponse, error) {
 	err := validation.EmailValidation(email)
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.GetUserByEmail(ctx, email)
+	userData, err := s.repo.GetUserByEmail(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+	return &UserResponse{
+		Id:         userData.Id,
+		Email:      userData.Email,
+		Created_at: userData.Created_at,
+		Updated_at: userData.Updated_at,
+	}, nil
 }
 
-func (s *userService) GetUserByID(ctx context.Context, id string) (*UserWithPasswordResponse, error) {
+func (s *userService) GetUserByID(ctx context.Context, id string) (*UserResponse, error) {
 	return s.repo.GetUserByID(ctx, id)
 }
 
