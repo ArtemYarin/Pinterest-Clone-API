@@ -79,7 +79,7 @@ func (s *userService) LoginUser(ctx context.Context, user CredentialsUserRequest
 	}
 
 	// Password validation
-	if err := password.CheckPassword(user.Password_hash, storedUser.Password_hash); err != nil {
+	if err := password.CheckPassword(storedUser.Password_hash, user.Password_hash); err != nil {
 		return "", fmt.Errorf("service LoginUser: invalid credentials")
 	}
 
@@ -118,6 +118,20 @@ func (s *userService) UpdateUser(ctx context.Context, user UpdateUserRequest) er
 	err := s.validate.Struct(user)
 	if err != nil {
 		return fmt.Errorf("service RegisterUser: %v", err)
+	}
+
+	// Validate and hash password if provided
+	if user.Password_hash != nil {
+		err = validation.PasswordStrengthValidation(*user.Password_hash)
+		if err != nil {
+			return fmt.Errorf("service UpdateUser: %v", err)
+		}
+
+		hashedPassword, err := password.HashPassword(*user.Password_hash)
+		if err != nil {
+			return fmt.Errorf("service UpdateUser: %v", err)
+		}
+		*user.Password_hash = hashedPassword
 	}
 
 	return s.repo.UpdateUser(ctx, user)

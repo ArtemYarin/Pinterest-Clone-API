@@ -150,6 +150,7 @@ func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 			"code":    "500",
 			"message": err.Error(),
 		})
+		return
 	}
 
 	// Response writing

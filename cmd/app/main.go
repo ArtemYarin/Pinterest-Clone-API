@@ -10,8 +10,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ArtemYarin/pinterest-clone-api/internal/app/auth"
 	"github.com/ArtemYarin/pinterest-clone-api/internal/postgres"
-	"github.com/go-chi/chi/v5"
+	"github.com/ArtemYarin/pinterest-clone-api/internal/router"
+	"github.com/go-playground/validator/v10"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 )
@@ -39,8 +41,16 @@ func main() {
 	defer pool.Close()
 	log.Println("Connected to PostgreSQL successfully")
 
+	// Validator
+	validate := validator.New()
+
 	// Wiring
-	r := chi.NewRouter()
+	userRepo := auth.NewUserRepository(pool)
+	userService := auth.NewUserService(userRepo, validate)
+	userHandler := auth.NewUserHandler(userService)
+
+	r := router.SetupRouter(userHandler)
+
 	r.Get("/health", healthHandler(pool))
 
 	// Server setup

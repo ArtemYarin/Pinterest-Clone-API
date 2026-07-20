@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -29,7 +30,7 @@ func (r *userRepository) CreateUser(ctx context.Context, user CredentialsUserReq
 		user.Email, user.Password_hash).
 		Scan(&u.Id, &u.Email, &u.Created_at, &u.Updated_at)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("INSERT user error: %v", err)
 	}
 	return &u, nil
 }
@@ -58,15 +59,27 @@ func (r *userRepository) GetUserByID(ctx context.Context, id string) (*UserRespo
 
 func (r *userRepository) UpdateUser(ctx context.Context, user UpdateUserRequest) error {
 	query := "UPDATE users SET updated_at = NOW()"
+	args := []interface{}{}
+	argIndex := 1
+
 	if user.Email != nil {
-		query += fmt.Sprintf(", SET email = %s", *user.Email)
+		query += fmt.Sprintf(", email = $%d", argIndex)
+		args = append(args, *user.Email)
+		argIndex++
 	}
 	if user.Password_hash != nil {
-		query += fmt.Sprintf(", SET password_hash = %s", *user.Password_hash)
+		query += fmt.Sprintf(", password_hash = $%d", argIndex)
+		args = append(args, *user.Password_hash)
+		argIndex++
 	}
-	query += fmt.Sprintf(" WHERE id = %s", user.Id)
+	if len(args) == 0 {
+		return errors.New("no fields to update")
+	}
 
-	_, err := r.db.Exec(ctx, query)
+	query += fmt.Sprintf(" WHERE id = $%d", argIndex)
+	args = append(args, user.Id)
+
+	_, err := r.db.Exec(ctx, query, args...)
 
 	return err
 }
