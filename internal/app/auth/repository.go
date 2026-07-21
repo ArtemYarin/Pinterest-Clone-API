@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -30,7 +29,10 @@ func (r *userRepository) CreateUser(ctx context.Context, user CredentialsUserReq
 		user.Email, user.Password_hash).
 		Scan(&u.Id, &u.Email, &u.Created_at, &u.Updated_at)
 	if err != nil {
-		return nil, fmt.Errorf("INSERT user error: %v", err)
+		if isDuplicateErr(err) {
+			return nil, fmt.Errorf("email %v already exists: %w", user.Email, errEmailExists)
+		}
+		return nil, fmt.Errorf("CreateUser %v: %v", user, err)
 	}
 	return &u, nil
 }
@@ -41,7 +43,10 @@ func (r *userRepository) GetUserByEmail(ctx context.Context, email string) (*Use
 		"SELECT id, email, password_hash, created_at, updated_at FROM users WHERE email = $1", email).
 		Scan(&u.Id, &u.Email, &u.Password_hash, &u.Created_at, &u.Updated_at)
 	if err != nil {
-		return nil, err
+		if isNotFoundErr(err) {
+			return nil, fmt.Errorf("email %s not found: %w", email, errUserNotFound)
+		}
+		return nil, fmt.Errorf("GetUserByEmail email %v: %v", email, err)
 	}
 	return &u, nil
 }
@@ -52,7 +57,10 @@ func (r *userRepository) GetUserByID(ctx context.Context, id string) (*UserRespo
 		"SELECT id, email, created_at, updated_at FROM users WHERE id = $1", id).
 		Scan(&u.Id, &u.Email, &u.Created_at, &u.Updated_at)
 	if err != nil {
-		return nil, err
+		if isNotFoundErr(err) {
+			return nil, fmt.Errorf("id %s not found: %w", id, errUserNotFound)
+		}
+		return nil, fmt.Errorf("GetUserByID id %v: %v", id, err)
 	}
 	return &u, nil
 }
@@ -73,7 +81,7 @@ func (r *userRepository) UpdateUser(ctx context.Context, user UpdateUserRequest)
 		argIndex++
 	}
 	if len(args) == 0 {
-		return errors.New("no fields to update")
+		return fmt.Errorf("no fields to update: %w", errValidation)
 	}
 
 	query += fmt.Sprintf(" WHERE id = $%d", argIndex)
@@ -81,5 +89,5 @@ func (r *userRepository) UpdateUser(ctx context.Context, user UpdateUserRequest)
 
 	_, err := r.db.Exec(ctx, query, args...)
 
-	return err
+	return fmt.Errorf("UpdateUser: %w", err)
 }

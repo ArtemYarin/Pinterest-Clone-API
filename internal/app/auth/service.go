@@ -31,32 +31,32 @@ func (s *userService) RegisterUser(ctx context.Context, user CredentialsUserRequ
 	// Validate input
 	err := s.validate.Struct(user)
 	if err != nil {
-		return nil, fmt.Errorf("service RegisterUser: %v", err)
+		return nil, fmt.Errorf("input validation: %w", err)
 	}
 
 	// Validate password
 	err = validation.PasswordStrengthValidation(user.Password_hash)
 	if err != nil {
-		return nil, fmt.Errorf("service RegisterUser: %v", err)
+		return nil, fmt.Errorf("password validation: %w", err)
 	}
 
 	// Password hashing
 	hashedPassword, err := password.HashPassword(user.Password_hash)
 	if err != nil {
-		return nil, fmt.Errorf("service RegisterUser: %v", err)
+		return nil, fmt.Errorf("password hashing %s: %w", user.Password_hash, err)
 	}
 	user.Password_hash = hashedPassword
 
-	// Repo
+	// Repository call
 	u, err := s.repo.CreateUser(ctx, user)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create user in repository: %w", err)
 	}
 
 	// Token
 	token, err := jwt.GenerateToken(u.Id)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("generate token: %w:", err)
 	}
 
 	return &UserWithTokenResponse{
@@ -75,18 +75,18 @@ func (s *userService) LoginUser(ctx context.Context, user CredentialsUserRequest
 	// Repo
 	storedUser, err := s.repo.GetUserByEmail(ctx, user.Email)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("get user from repository: %w", err)
 	}
 
 	// Password validation
 	if err := password.CheckPassword(storedUser.Password_hash, user.Password_hash); err != nil {
-		return "", fmt.Errorf("service LoginUser: invalid credentials")
+		return "", fmt.Errorf("password compare: %w", errUnauthorized)
 	}
 
 	// Token
 	token, err := jwt.GenerateToken(storedUser.Id)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("generate token: %w:", err)
 	}
 
 	return token, nil
@@ -95,11 +95,11 @@ func (s *userService) LoginUser(ctx context.Context, user CredentialsUserRequest
 func (s *userService) GetUserByEmail(ctx context.Context, email string) (*UserResponse, error) {
 	err := validation.EmailValidation(email)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("email validation: %w", err)
 	}
 	userData, err := s.repo.GetUserByEmail(ctx, email)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get user from repository: %w", err)
 	}
 	return &UserResponse{
 		Id:         userData.Id,
@@ -110,26 +110,35 @@ func (s *userService) GetUserByEmail(ctx context.Context, email string) (*UserRe
 }
 
 func (s *userService) GetUserByID(ctx context.Context, id string) (*UserResponse, error) {
-	return s.repo.GetUserByID(ctx, id)
+	// Validate id
+	if !validation.IsValidUUID(id) {
+		return nil, fmt.Errorf("invalid user id: %w", errValidation)
+	}
+
+	user, err := s.repo.GetUserByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("get user from repository: %w", err)
+	}
+	return user, nil
 }
 
 func (s *userService) UpdateUser(ctx context.Context, user UpdateUserRequest) error {
 	// Validate input
 	err := s.validate.Struct(user)
 	if err != nil {
-		return fmt.Errorf("service RegisterUser: %v", err)
+		return fmt.Errorf("service RegisterUser: %w", err)
 	}
 
 	// Validate and hash password if provided
 	if user.Password_hash != nil {
 		err = validation.PasswordStrengthValidation(*user.Password_hash)
 		if err != nil {
-			return fmt.Errorf("service UpdateUser: %v", err)
+			return fmt.Errorf("password strength validation: %w", err)
 		}
 
 		hashedPassword, err := password.HashPassword(*user.Password_hash)
 		if err != nil {
-			return fmt.Errorf("service UpdateUser: %v", err)
+			return fmt.Errorf("hashing password: %w", err)
 		}
 		*user.Password_hash = hashedPassword
 	}

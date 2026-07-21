@@ -2,6 +2,7 @@ package auth
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/ArtemYarin/pinterest-clone-api/internal/middleware"
@@ -19,55 +20,39 @@ func NewUserHandler(s UserService) UserHandler {
 func (h *UserHandler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 	// Decode body
 	var user CredentialsUserRequest
-	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
-		json.NewEncoder(w).Encode(map[string]string{
-			"code":    "400",
-			"message": "Can't decode json body",
-		})
+	if err := DecodeJSON(&user, r); err != nil {
+		WriteJSONError(err, w)
 		return
 	}
 
 	// Service call
 	resp, err := h.service.RegisterUser(r.Context(), user)
 	if err != nil {
-		json.NewEncoder(w).Encode(map[string]string{
-			"code":    "500",
-			"message": err.Error(),
-		})
+		WriteJSONError(fmt.Errorf("register user: %w", err), w)
 		return
 	}
 
 	// Response writing
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(201)
-	json.NewEncoder(w).Encode(resp)
+	WriteJSON(w, http.StatusCreated, resp)
 }
 
 func (h *UserHandler) LoginUser(w http.ResponseWriter, r *http.Request) {
 	// Decode body
 	var user CredentialsUserRequest
-	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
-		json.NewEncoder(w).Encode(map[string]string{
-			"code":    "400",
-			"message": "Can't decode json body",
-		})
+	if err := DecodeJSON(&user, r); err != nil {
+		WriteJSONError(err, w)
 		return
 	}
 
 	// Service call
 	token, err := h.service.LoginUser(r.Context(), user)
 	if err != nil {
-		json.NewEncoder(w).Encode(map[string]string{
-			"code":    "500",
-			"message": err.Error(),
-		})
+		WriteJSONError(fmt.Errorf("login user: %w", err), w)
 		return
 	}
 
 	// Response writing
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-	json.NewEncoder(w).Encode(map[string]string{"token": token})
+	WriteJSON(w, 200, map[string]string{"token": token})
 }
 
 func (h *UserHandler) GetUserByEmail(w http.ResponseWriter, r *http.Request) {
@@ -76,17 +61,12 @@ func (h *UserHandler) GetUserByEmail(w http.ResponseWriter, r *http.Request) {
 	// Service call
 	resp, err := h.service.GetUserByEmail(r.Context(), email)
 	if err != nil {
-		json.NewEncoder(w).Encode(map[string]string{
-			"code":    "500",
-			"message": err.Error(),
-		})
+		WriteJSONError(fmt.Errorf("get user by email: %w", err), w)
 		return
 	}
 
 	// Response writing
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-	json.NewEncoder(w).Encode(resp)
+	WriteJSON(w, 200, resp)
 }
 
 func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
@@ -95,17 +75,12 @@ func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 	// Service call
 	resp, err := h.service.GetUserByID(r.Context(), id)
 	if err != nil {
-		json.NewEncoder(w).Encode(map[string]string{
-			"code":    "500",
-			"message": err.Error(),
-		})
+		WriteJSONError(fmt.Errorf("get user by id: %w", err), w)
 		return
 	}
 
 	// Response writing
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-	json.NewEncoder(w).Encode(resp)
+	WriteJSON(w, 200, resp)
 }
 
 func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
@@ -115,29 +90,20 @@ func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	// Decode json
 	var user UpdateUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
-		json.NewEncoder(w).Encode(map[string]string{
-			"code":    "400",
-			"message": "Can't decode json body",
-		})
+		WriteJSONError(err, w)
 		return
 	}
 
 	// Security
 	claims, ok := middleware.GetUserClaims(r)
 	if !ok {
-		json.NewEncoder(w).Encode(map[string]string{
-			"code":    "401",
-			"message": "Unauthorized",
-		})
+		WriteJSONError(errUnauthorized, w)
 		return
 	}
 
 	// Compare provided id with JWT claims
 	if claims.UserID.String() != id {
-		json.NewEncoder(w).Encode(map[string]string{
-			"code":    "403",
-			"message": "Forbidden",
-		})
+		WriteJSONError(errForbidden, w)
 		return
 	}
 
@@ -146,15 +112,10 @@ func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	// Service call
 	err := h.service.UpdateUser(r.Context(), user)
 	if err != nil {
-		json.NewEncoder(w).Encode(map[string]string{
-			"code":    "500",
-			"message": err.Error(),
-		})
+		WriteJSONError(fmt.Errorf("update user: %w", err), w)
 		return
 	}
 
 	// Response writing
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-	json.NewEncoder(w).Encode("Updated successfully")
+	WriteJSON(w, 200, "Updated successfully")
 }
