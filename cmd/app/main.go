@@ -85,14 +85,17 @@ func main() {
 
 func healthHandler(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		code := http.StatusOK
 		status := "ok"
 		postgresStatus := "healthy"
 		if err := db.Ping(r.Context()); err != nil {
+			code = http.StatusServiceUnavailable
 			postgresStatus = "unhealthy"
+			status = "unhealthy"
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(code)
 		json.NewEncoder(w).Encode(map[string]any{
 			"status":    status,
 			"timestamp": time.Now().UTC().Format(time.RFC3339),

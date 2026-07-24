@@ -2,18 +2,40 @@ package auth
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-var errBadRequest = errors.New("bad request error")
-var errUserNotFound = errors.New("user not found error")
-var errValidation = errors.New("validation error")
-var errInternalServer = errors.New("internal server error")
-var errUnauthorized = errors.New("unauthorized error")
+// Sentinel errors
 var errForbidden = errors.New("forbidden error")
 var errEmailExists = errors.New("conflict error")
+var errBadRequest = errors.New("bad request error")
+var errUnauthorized = errors.New("unauthorized error")
+var errUserNotFound = errors.New("user not found error")
+var errInternalServer = errors.New("internal server error")
+
+// Validation error
+type errValidation struct {
+	Err     error             `json:"-"`
+	Details map[string]string `json:"details"`
+}
+
+func (e *errValidation) Error() string {
+	return fmt.Sprintf("error: %s", e.Err)
+}
+
+func (e *errValidation) Unwrap() error {
+	return e.Err
+}
+
+func newValidationErr(dets map[string]string) *errValidation {
+	return &errValidation{
+		Err:     fmt.Errorf("validation error: %v", dets),
+		Details: dets,
+	}
+}
 
 // Helpers
 func isDuplicateErr(err error) bool {

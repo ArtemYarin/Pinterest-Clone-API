@@ -81,13 +81,16 @@ func (r *userRepository) UpdateUser(ctx context.Context, user UpdateUserRequest)
 		argIndex++
 	}
 	if len(args) == 0 {
-		return fmt.Errorf("no fields to update: %w", errValidation)
+		return fmt.Errorf("no fields to update: %w", errBadRequest)
 	}
 
 	query += fmt.Sprintf(" WHERE id = $%d", argIndex)
 	args = append(args, user.Id)
 
 	_, err := r.db.Exec(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("UpdateUser: %w", err)
+	}
 
-	return fmt.Errorf("UpdateUser: %w", err)
+	return nil
 }

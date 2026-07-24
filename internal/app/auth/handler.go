@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -72,6 +71,11 @@ func (h *UserHandler) GetUserByEmail(w http.ResponseWriter, r *http.Request) {
 func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
+	if !IsValidUUID(id) {
+		WriteJSONError(fmt.Errorf("get user by id: %w", errBadRequest), w)
+		return
+	}
+
 	// Service call
 	resp, err := h.service.GetUserByID(r.Context(), id)
 	if err != nil {
@@ -89,7 +93,7 @@ func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 
 	// Decode json
 	var user UpdateUserRequest
-	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+	if err := DecodeJSON(&user, r); err != nil {
 		WriteJSONError(err, w)
 		return
 	}

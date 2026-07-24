@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/ArtemYarin/pinterest-clone-api/internal/app/auth/password"
-	"github.com/ArtemYarin/pinterest-clone-api/internal/app/auth/validation"
 	"github.com/ArtemYarin/pinterest-clone-api/internal/jwt"
 	"github.com/go-playground/validator/v10"
 )
@@ -31,11 +30,12 @@ func (s *userService) RegisterUser(ctx context.Context, user CredentialsUserRequ
 	// Validate input
 	err := s.validate.Struct(user)
 	if err != nil {
-		return nil, fmt.Errorf("input validation: %w", err)
+		valErr := newValidationErr(getValidationMap(err))
+		return nil, fmt.Errorf("input validation: %w", valErr)
 	}
 
 	// Validate password
-	err = validation.PasswordStrengthValidation(user.Password_hash)
+	err = PasswordStrengthValidation(user.Password_hash)
 	if err != nil {
 		return nil, fmt.Errorf("password validation: %w", err)
 	}
@@ -69,7 +69,8 @@ func (s *userService) LoginUser(ctx context.Context, user CredentialsUserRequest
 	// Validate input
 	err := s.validate.Struct(user)
 	if err != nil {
-		return "", fmt.Errorf("service LoginUser: %v", err)
+		valErr := newValidationErr(getValidationMap(err))
+		return "", fmt.Errorf("service LoginUser: %w", valErr)
 	}
 
 	// Repo
@@ -80,7 +81,7 @@ func (s *userService) LoginUser(ctx context.Context, user CredentialsUserRequest
 
 	// Password validation
 	if err := password.CheckPassword(storedUser.Password_hash, user.Password_hash); err != nil {
-		return "", fmt.Errorf("password compare: %w", errUnauthorized)
+		return "", fmt.Errorf("compare password: %w", errUnauthorized)
 	}
 
 	// Token
@@ -93,7 +94,7 @@ func (s *userService) LoginUser(ctx context.Context, user CredentialsUserRequest
 }
 
 func (s *userService) GetUserByEmail(ctx context.Context, email string) (*UserResponse, error) {
-	err := validation.EmailValidation(email)
+	err := EmailValidation(email)
 	if err != nil {
 		return nil, fmt.Errorf("email validation: %w", err)
 	}
@@ -110,11 +111,6 @@ func (s *userService) GetUserByEmail(ctx context.Context, email string) (*UserRe
 }
 
 func (s *userService) GetUserByID(ctx context.Context, id string) (*UserResponse, error) {
-	// Validate id
-	if !validation.IsValidUUID(id) {
-		return nil, fmt.Errorf("invalid user id: %w", errValidation)
-	}
-
 	user, err := s.repo.GetUserByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("get user from repository: %w", err)
@@ -131,7 +127,7 @@ func (s *userService) UpdateUser(ctx context.Context, user UpdateUserRequest) er
 
 	// Validate and hash password if provided
 	if user.Password_hash != nil {
-		err = validation.PasswordStrengthValidation(*user.Password_hash)
+		err = PasswordStrengthValidation(*user.Password_hash)
 		if err != nil {
 			return fmt.Errorf("password strength validation: %w", err)
 		}
@@ -143,5 +139,9 @@ func (s *userService) UpdateUser(ctx context.Context, user UpdateUserRequest) er
 		*user.Password_hash = hashedPassword
 	}
 
-	return s.repo.UpdateUser(ctx, user)
+	err = s.repo.UpdateUser(ctx, user)
+	if err != nil {
+		return fmt.Errorf("update user in repository: %w", err)
+	}
+	return nil
 }

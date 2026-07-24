@@ -44,7 +44,16 @@ func WriteJSONError(err error, w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 
 	log.Printf("Error: %v", err.Error())
+
+	var valErr *errValidation
 	switch {
+	case errors.As(err, &valErr):
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		json.NewEncoder(w).Encode(map[string]any{
+			"code":    "422",
+			"Details": valErr.Details,
+		})
+		return
 	case errors.Is(err, errEmailExists):
 		w.WriteHeader(http.StatusConflict)
 		json.NewEncoder(w).Encode(map[string]string{
