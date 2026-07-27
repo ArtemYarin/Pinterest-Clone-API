@@ -1,11 +1,14 @@
 package auth
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/ArtemYarin/pinterest-clone-api/internal/middleware"
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type UserHandler struct {
@@ -122,4 +125,27 @@ func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 
 	// Response writing
 	WriteJSON(w, 200, "Updated successfully")
+}
+
+// Health
+func Health(db *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		code := http.StatusOK
+		status := "ok"
+		postgresStatus := "healthy"
+		if err := db.Ping(r.Context()); err != nil {
+			code = http.StatusServiceUnavailable
+			postgresStatus = "unhealthy"
+			status = "unhealthy"
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(code)
+		json.NewEncoder(w).Encode(map[string]any{
+			"service":    "auth-service",
+			"status":     status,
+			"PostgreSQL": postgresStatus,
+			"timestamp":  time.Now().UTC().Format(time.RFC3339),
+		})
+	}
 }
