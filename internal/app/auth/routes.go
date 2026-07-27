@@ -3,10 +3,13 @@ package auth
 import (
 	"github.com/ArtemYarin/pinterest-clone-api/internal/middleware"
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func UserRouter(handler *UserHandler) chi.Router {
+func UserRouter(handler *UserHandler, userPool *pgxpool.Pool) chi.Router {
 	r := chi.NewRouter()
+
+	r.Get("/health", Health(userPool))
 
 	r.Post("/signup", handler.RegisterUser)
 	r.Post("/login", handler.LoginUser)
