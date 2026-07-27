@@ -48,12 +48,23 @@ func NewPool(dbUrl string, cfg PoolConfig) (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
-func GetPostgresDSN() string {
-	dbUser := os.Getenv("POSTGRES_USER")
-	dbPassword := os.Getenv("POSTGRES_PASSWORD")
-	dbHost := os.Getenv("POSTGRES_HOST")
-	dbPort := os.Getenv("POSTGRES_PORT")
-	dbName := os.Getenv("POSTGRES_DB")
+func GetUsersPostgresDSN() string {
+	dbUser := os.Getenv("POSTGRES_USERS_USER")
+	dbPassword := os.Getenv("POSTGRES_USERS_PASSWORD")
+	dbHost := os.Getenv("POSTGRES_USERS_HOST")
+	dbPort := os.Getenv("POSTGRES_USERS_PORT")
+	dbName := os.Getenv("POSTGRES_USERS_DB")
+
+	return fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=disable",
+		dbUser, dbPassword, dbHost, dbPort, dbName)
+}
+
+func GetPinsPostgresDSN() string {
+	dbUser := os.Getenv("POSTGRES_PINS_USER")
+	dbPassword := os.Getenv("POSTGRES_PINS_PASSWORD")
+	dbHost := os.Getenv("POSTGRES_PINS_HOST")
+	dbPort := os.Getenv("POSTGRES_PINS_PORT")
+	dbName := os.Getenv("POSTGRES_PINS_DB")
 
 	return fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=disable",
 		dbUser, dbPassword, dbHost, dbPort, dbName)
