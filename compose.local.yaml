@@ -1,34 +1,69 @@
 services:
-  postgres:
+  # ============= DATABASES =============
+  postgres-users:
     image: postgres:18
-    container_name: postgres_server
+    container_name: postgres_users
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_USERS_DB}
+      POSTGRES_USER: ${POSTGRES_USERS_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_USERS_PASSWORD}
     ports:
       - '5432:5432'
     volumes:
-      - pgdata:/var/lib/postgresql
+      - pgdata-users:/var/lib/postgresql
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USERS_USER} -d ${POSTGRES_USERS_DB}']
       interval: 5s
       timeout: 5s
       retries: 5
       start_period: 10s
 
-  migrate:
+  postgres-pins:
+    image: postgres:18
+    container_name: postgres_pins
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_PINS_DB}
+      POSTGRES_USER: ${POSTGRES_PINS_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PINS_PASSWORD}
+    ports:
+      - '5433:5432'
+    volumes:
+      - pgdata-pins:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_PINS_USER} -d ${POSTGRES_PINS_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ============= MIGRATION SERVICES =============
+
+  migrate-users:
     image: migrate/migrate
     env_file: .env
     volumes:
      - ./internal/app/auth/migrations:/migrations
-    command: -path /migrations -database  postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable up
+    command: -path /migrations -database  postgres://${POSTGRES_USERS_USER}:${POSTGRES_USERS_PASSWORD}@postgres-users:5432/${POSTGRES_USERS_DB}?sslmode=disable up
     depends_on:
-      postgres:
+      postgres-users:
+        condition: service_healthy
+    restart: no
+
+  migrate-pins:
+    image: migrate/migrate
+    env_file: .env
+    volumes:
+     - ./internal/app/pin/migrations:/migrations
+    command: -path /migrations -database  postgres://${POSTGRES_PINS_USER}:${POSTGRES_PINS_PASSWORD}@postgres-pins:5432/${POSTGRES_PINS_DB}?sslmode=disable up
+    depends_on:
+      postgres-pins:
         condition: service_healthy
     restart: no
     
+# ============= VOLUMES =============
 
 volumes:
-  pgdata:
+  pgdata-users:
+  pgdata-pins:
