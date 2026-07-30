@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ArtemYarin/pinterest-clone-api/internal/app/auth/password"
-	"github.com/ArtemYarin/pinterest-clone-api/internal/jwt"
+	"github.com/ArtemYarin/pinterest-clone-api/services/auth-service/jwt"
 	"github.com/go-playground/validator/v10"
 )
 
@@ -122,7 +122,8 @@ func (s *userService) UpdateUser(ctx context.Context, user UpdateUserRequest) er
 	// Validate input
 	err := s.validate.Struct(user)
 	if err != nil {
-		return fmt.Errorf("service RegisterUser: %w", err)
+		valErr := newValidationErr(getValidationMap(err))
+		return fmt.Errorf("service UpdateUser: %w", valErr)
 	}
 
 	// Validate and hash password if provided

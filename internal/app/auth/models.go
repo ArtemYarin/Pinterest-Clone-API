@@ -13,8 +13,8 @@ type CredentialsUserRequest struct {
 
 type UpdateUserRequest struct {
 	Id            uuid.UUID `json:"id"`
-	Email         *string   `json:"email,omitempty" validate:"email"`
-	Password_hash *string   `json:"password_hash,omitempty" validate:"min=8,max=50"`
+	Email         *string   `json:"email,omitempty" validate:"omitempty,email"`
+	Password_hash *string   `json:"password_hash,omitempty" validate:"omitempty,min=8,max=50"`
 }
 
 type UserResponse struct {

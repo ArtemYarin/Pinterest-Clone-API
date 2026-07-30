@@ -1,0 +1,38 @@
+services:
+  # ============= DATABASES =============
+  postgres-auth:
+    image: postgres:18
+    container_name: postgres_auth
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata-auth:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ============= MIGRATION SERVICES =============
+
+  migrate-users:
+    image: migrate/migrate
+    env_file: .env
+    volumes:
+     - ./migrations:/migrations
+    command: -path /migrations -database  postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-auth:5432/${POSTGRES_DB}?sslmode=disable up
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+    restart: no
+
+# ============= VOLUMES =============
+
+volumes:
+  pgdata-auth:
