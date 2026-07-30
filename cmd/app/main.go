@@ -10,7 +10,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ArtemYarin/pinterest-clone-api/internal/app/auth"
 	"github.com/ArtemYarin/pinterest-clone-api/internal/app/pin"
 	"github.com/ArtemYarin/pinterest-clone-api/internal/postgres"
 	"github.com/ArtemYarin/pinterest-clone-api/internal/router"
@@ -27,26 +26,9 @@ func main() {
 
 	// Connecting to db
 
-	// Users db
-	dbUrl := postgres.GetUsersPostgresDSN()
-	config := postgres.PoolConfig{
-		MaxConns:          25,
-		MinConns:          10,
-		MaxConnIdleTime:   2 * time.Minute,
-		MaxConnLifetime:   5 * time.Minute,
-		HealthCheckPeriod: 30 * time.Second,
-	}
-
-	usersPool, err := postgres.NewPool(dbUrl, config)
-	if err != nil {
-		log.Fatalf("Failed to connect: %v", err)
-	}
-	defer usersPool.Close()
-	log.Println("Connected to users PostgreSQL successfully")
-
 	// Pins db
-	dbUrl = postgres.GetPinsPostgresDSN()
-	config = postgres.PoolConfig{
+	dbUrl := postgres.GetPinsPostgresDSN()
+	config := postgres.PoolConfig{
 		MaxConns:          25,
 		MinConns:          10,
 		MaxConnIdleTime:   2 * time.Minute,
@@ -65,17 +47,13 @@ func main() {
 	validate := validator.New()
 
 	// Wiring
-	userRepo := auth.NewUserRepository(usersPool)
-	userService := auth.NewUserService(userRepo, validate)
-	userHandler := auth.NewUserHandler(userService)
-
 	pinRepo := pin.NewPinRepository(pinsPool)
 	pinService := pin.NewPinService(pinRepo, validate)
 	pinHandler := pin.NewPinHandler(pinService)
 
-	r := router.SetupRouter(userHandler, pinHandler, usersPool, pinsPool)
+	r := router.SetupRouter(pinHandler, pinsPool)
 
-	r.Get("/health", healthHandler(usersPool, pinsPool))
+	r.Get("/health", healthHandler(pinsPool))
 
 	// Server setup
 	srv := http.Server{
@@ -107,17 +85,11 @@ func main() {
 	log.Println("server stopped cleanly")
 }
 
-func healthHandler(authDb *pgxpool.Pool, pinDb *pgxpool.Pool) http.HandlerFunc {
+func healthHandler(pinDb *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		code := http.StatusOK
 		status := "ok"
-		postgresAuthStatus := "healthy"
 		postgresPinStatus := "healthy"
-		if err := authDb.Ping(r.Context()); err != nil {
-			code = http.StatusServiceUnavailable
-			postgresAuthStatus = "unhealthy"
-			status = "unhealthy"
-		}
 		if err := pinDb.Ping(r.Context()); err != nil {
 			code = http.StatusServiceUnavailable
 			postgresPinStatus = "unhealthy"
@@ -131,7 +103,6 @@ func healthHandler(authDb *pgxpool.Pool, pinDb *pgxpool.Pool) http.HandlerFunc {
 			"timestamp": time.Now().UTC().Format(time.RFC3339),
 			"services": map[string]string{
 				"pinterest-clone-api": "ok",
-				"PostgreSQL Auth":     postgresAuthStatus,
 				"PostgreSQL Pin":      postgresPinStatus,
 			},
 		})

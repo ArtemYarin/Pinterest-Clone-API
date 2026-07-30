@@ -49,7 +49,7 @@ func main() {
 
 	// Server setup
 	srv := http.Server{
-		Addr:           ":8080",
+		Addr:           ":8081",
 		Handler:        r,
 		ReadTimeout:    5 * time.Second,
 		WriteTimeout:   10 * time.Second,
