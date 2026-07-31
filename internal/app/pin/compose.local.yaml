@@ -1,0 +1,38 @@
+services:
+  # ============= DATABASES =============
+  postgres-pin:
+    image: postgres:18
+    container_name: postgres_pin
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - '5433:5432'
+    volumes:
+      - pgdata-pin:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ============= MIGRATION SERVICES =============
+
+  migrate-pins:
+    image: migrate/migrate
+    env_file: .env
+    volumes:
+     - ./migrations:/migrations
+    command: -path /migrations -database  postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-pin:5432/${POSTGRES_DB}?sslmode=disable up
+    depends_on:
+      postgres-pin:
+        condition: service_healthy
+    restart: no
+
+# ============= VOLUMES =============
+
+volumes:
+  pgdata-pin:
