@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ArtemYarin/pinterest-clone-api/internal/app/auth/password"
-	"github.com/ArtemYarin/pinterest-clone-api/services/auth-service/jwt"
+	"github.com/ArtemYarin/pinterest-clone-api/services/auth-service/internal/jwt"
+	"github.com/ArtemYarin/pinterest-clone-api/services/auth-service/internal/password"
 	"github.com/go-playground/validator/v10"
 )
 

@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"github.com/ArtemYarin/pinterest-clone-api/services/auth-service/middleware"
+	"github.com/ArtemYarin/pinterest-clone-api/services/auth-service/internal/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )

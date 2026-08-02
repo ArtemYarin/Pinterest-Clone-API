@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/ArtemYarin/pinterest-clone-api/internal/jwt"
+	"github.com/ArtemYarin/pinterest-clone-api/services/auth-service/internal/jwt"
 )
 
 type contextKey string

@@ -3,7 +3,6 @@ module github.com/ArtemYarin/pinterest-clone-api/services/auth-service
 go 1.26.1
 
 require (
-	github.com/ArtemYarin/pinterest-clone-api v0.0.0-20260727125716-6599928ed9b8
 	github.com/go-chi/chi/v5 v5.3.1
 	github.com/go-playground/validator/v10 v10.30.3
 	github.com/golang-jwt/jwt/v5 v5.3.1
