@@ -9,8 +9,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ArtemYarin/pinterest-clone-api/services/pin-service"
-	"github.com/ArtemYarin/pinterest-clone-api/services/pin-service/postgres"
+	pin "github.com/ArtemYarin/pinterest-clone-api/services/pin-service/internal"
+	"github.com/ArtemYarin/pinterest-clone-api/services/pin-service/internal/postgres"
 	"github.com/go-playground/validator/v10"
 	"github.com/joho/godotenv"
 )
