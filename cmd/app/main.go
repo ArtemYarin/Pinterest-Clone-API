@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ArtemYarin/pinterest-clone-api/internal/router"
+	"github.com/ArtemYarin/pinterest-clone-api/router"
 )
 
 func main() {

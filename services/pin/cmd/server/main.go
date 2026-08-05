@@ -9,8 +9,8 @@ import (
 	"syscall"
 	"time"
 
-	auth "github.com/ArtemYarin/pinterest-clone-api/services/auth-service/internal"
-	"github.com/ArtemYarin/pinterest-clone-api/services/auth-service/internal/postgres"
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/postgres"
+	pin "github.com/ArtemYarin/pinterest-clone-api/services/pin-service/internal"
 	"github.com/go-playground/validator/v10"
 	"github.com/joho/godotenv"
 )
@@ -22,7 +22,7 @@ func main() {
 	}
 
 	// Connecting to db
-	dbUrl := postgres.GetAuthPostgresDSN()
+	dbUrl := pin.GetPinPostgresDSN()
 	config := postgres.PoolConfig{
 		MaxConns:          25,
 		MinConns:          10,
@@ -41,15 +41,15 @@ func main() {
 	validate := validator.New()
 
 	// Wiring
-	userRepo := auth.NewUserRepository(pool)
-	userService := auth.NewUserService(userRepo, validate)
-	userHandler := auth.NewUserHandler(userService)
+	pinRepo := pin.NewPinRepository(pool)
+	pinService := pin.NewPinService(pinRepo, validate)
+	pinHandler := pin.NewPinHandler(pinService)
 
-	r := auth.UserRouter(&userHandler, pool)
+	r := pin.PinRouter(&pinHandler, pool)
 
 	// Server setup
 	srv := http.Server{
-		Addr:           ":8081",
+		Addr:           ":8082",
 		Handler:        r,
 		ReadTimeout:    5 * time.Second,
 		WriteTimeout:   10 * time.Second,

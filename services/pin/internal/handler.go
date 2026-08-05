@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ArtemYarin/pinterest-clone-api/services/pin-service/internal/middleware"
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
