@@ -25,7 +25,7 @@ services:
     image: migrate/migrate
     env_file: .env
     volumes:
-     - ./migrations:/migrations
+     - ./internal/migrations:/migrations
     command: -path /migrations -database  postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-pin:5432/${POSTGRES_DB}?sslmode=disable up
     depends_on:
       postgres-pin:
