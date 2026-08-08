@@ -11,6 +11,7 @@ import (
 type PinService interface {
 	CreatePin(ctx context.Context, userID uuid.UUID, pin CreatePinRequest) (*PinResponse, error)
 	GetPinByID(ctx context.Context, id string) (*PinResponse, error)
+	GetPins(ctx context.Context, filters PinFilters) ([]*PinResponse, int, error)
 	UpdatePin(ctx context.Context, id string, userID uuid.UUID, pin UpdatePinRequest) error
 	DeletePin(ctx context.Context, id string, userID uuid.UUID) error
 }
@@ -46,6 +47,14 @@ func (s *pinService) GetPinByID(ctx context.Context, id string) (*PinResponse, e
 		return nil, fmt.Errorf("get pin from repository: %w", err)
 	}
 	return p, nil
+}
+
+func (s *pinService) GetPins(ctx context.Context, filters PinFilters) ([]*PinResponse, int, error) {
+	pins, count, err := s.repo.GetPins(ctx, filters)
+	if err != nil {
+		return nil, 0, fmt.Errorf("get pins from repository: %w", err)
+	}
+	return pins, count, nil
 }
 
 func (s *pinService) UpdatePin(ctx context.Context, id string, userID uuid.UUID, pin UpdatePinRequest) error {

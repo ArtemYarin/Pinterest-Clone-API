@@ -11,7 +11,8 @@ func PinRouter(handler *PinHandler, pinPool *pgxpool.Pool) chi.Router {
 
 	r.Get("/health", Health(pinPool))
 
-	r.Get("/{id}", handler.GetPin)
+	r.Get("/{id}", handler.GetPinByID)
+	r.Get("/", handler.GetPins)
 
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.AuthMiddleware)

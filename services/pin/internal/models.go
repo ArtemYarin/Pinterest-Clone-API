@@ -27,5 +27,5 @@ type PinResponse struct {
 	Description *string   `json:"description,omitempty"`
 	Created_at  time.Time `json:"created_at"`
 	Updated_at  time.Time `json:"updated_at"`
-	Likes_count int       `json:"likes_count"`
+	Likes       int       `json:"likes"`
 }

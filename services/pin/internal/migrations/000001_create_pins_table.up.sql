@@ -6,7 +6,7 @@ CREATE TABLE pins (
     description VARCHAR(1000),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    likes_count INTEGER DEFAULT 0
+    likes INTEGER DEFAULT 0
 );
 
 CREATE INDEX idx_pins_title ON pins(title);

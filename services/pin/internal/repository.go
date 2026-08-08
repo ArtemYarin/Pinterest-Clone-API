@@ -11,6 +11,7 @@ import (
 type PinRepository interface {
 	CreatePin(ctx context.Context, userID uuid.UUID, pin CreatePinRequest) (*PinResponse, error)
 	GetPinByID(ctx context.Context, id string) (*PinResponse, error)
+	GetPins(ctx context.Context, filters PinFilters) ([]*PinResponse, int, error)
 	UpdatePin(ctx context.Context, pin UpdatePinRequest) error
 	DeletePin(ctx context.Context, id string) error
 }
@@ -28,9 +29,9 @@ func (r *pinRepository) CreatePin(ctx context.Context, userID uuid.UUID, pin Cre
 	err := r.db.QueryRow(ctx,
 		`INSERT INTO pins (user_id, title, image_url, description)
 		 VALUES ($1, $2, $3, $4)
-		 RETURNING id, user_id, title, image_url, description, created_at, updated_at, likes_count`,
+		 RETURNING id, user_id, title, image_url, description, created_at, updated_at, likes`,
 		userID, pin.Title, pin.Image_url, pin.Description).
-		Scan(&p.Id, &p.User_id, &p.Title, &p.Image_url, &p.Description, &p.Created_at, &p.Updated_at, &p.Likes_count)
+		Scan(&p.Id, &p.User_id, &p.Title, &p.Image_url, &p.Description, &p.Created_at, &p.Updated_at, &p.Likes)
 	if err != nil {
 		if isDuplicateErr(err) {
 			return nil, fmt.Errorf("image url %v already exists: %w", pin.Image_url, errImageURLExists)
@@ -43,9 +44,9 @@ func (r *pinRepository) CreatePin(ctx context.Context, userID uuid.UUID, pin Cre
 func (r *pinRepository) GetPinByID(ctx context.Context, id string) (*PinResponse, error) {
 	var p PinResponse
 	err := r.db.QueryRow(ctx,
-		`SELECT id, user_id, title, image_url, description, created_at, updated_at, likes_count
+		`SELECT id, user_id, title, image_url, description, created_at, updated_at, likes
 		 FROM pins WHERE id = $1`, id).
-		Scan(&p.Id, &p.User_id, &p.Title, &p.Image_url, &p.Description, &p.Created_at, &p.Updated_at, &p.Likes_count)
+		Scan(&p.Id, &p.User_id, &p.Title, &p.Image_url, &p.Description, &p.Created_at, &p.Updated_at, &p.Likes)
 	if err != nil {
 		if isNotFoundErr(err) {
 			return nil, fmt.Errorf("id %s not found: %w", id, errPinNotFound)
@@ -53,6 +54,84 @@ func (r *pinRepository) GetPinByID(ctx context.Context, id string) (*PinResponse
 		return nil, fmt.Errorf("GetPinByID id %v: %v", id, err)
 	}
 	return &p, nil
+}
+
+func (r *pinRepository) GetPins(ctx context.Context, filters PinFilters) ([]*PinResponse, int, error) {
+	// Query building
+	query := "SELECT id, user_id, title, image_url, description, created_at, updated_at, likes FROM pins WHERE 1=1"
+	args := []interface{}{}
+	argIndex := 1
+
+	// Apply filters
+	if filters.UserID != "" {
+		query += fmt.Sprintf(" AND user_id = $%d", argIndex)
+		args = append(args, filters.UserID)
+		argIndex++
+	}
+
+	if filters.Search != "" {
+		query += fmt.Sprintf(" AND (title ILIKE $%d OR description ILIKE $%d)", argIndex, argIndex+1)
+		args = append(args, "%"+filters.Search+"%", "%"+filters.Search+"%")
+		argIndex += 2
+	}
+
+	// Apply sorting
+	if filters.SortBy != "" {
+		order := "ASC"
+		if filters.SortOrder == "desc" {
+			order = "DESC"
+		}
+		query += fmt.Sprintf(" ORDER BY %s %s", filters.SortBy, order)
+	}
+
+	// Apply pagination
+	query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argIndex, argIndex+1)
+	args = append(args, filters.Limit, filters.Offset)
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("GetPins: %v: %w", err, errInternalServer)
+	}
+	defer rows.Close()
+
+	var pins []*PinResponse
+	for rows.Next() {
+		var p PinResponse
+		if err := rows.Scan(&p.Id, &p.User_id, &p.Title, &p.Image_url, &p.Description, &p.Created_at, &p.Updated_at, &p.Likes); err != nil {
+			return nil, 0, fmt.Errorf("unable to scan pin: %v: %w", err, errInternalServer)
+		}
+		pins = append(pins, &p)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("scan rows: %v: %w", err, errInternalServer)
+	}
+
+	// Total pins count
+	countQuery := "SELECT COUNT(*) FROM pins WHERE 1=1"
+	countArgs := []interface{}{}
+	countArgIndex := 1
+
+	// Apply filters
+	if filters.UserID != "" {
+		countQuery += fmt.Sprintf(" AND user_id = $%d", countArgIndex)
+		countArgs = append(countArgs, filters.UserID)
+		countArgIndex++
+	}
+
+	if filters.Search != "" {
+		countQuery += fmt.Sprintf(" AND (title ILIKE $%d OR description ILIKE $%d)", countArgIndex, countArgIndex+1)
+		countArgs = append(countArgs, "%"+filters.Search+"%", "%"+filters.Search+"%")
+		countArgIndex += 2
+	}
+
+	var count int
+	err = r.db.QueryRow(ctx, countQuery, countArgs...).Scan(&count)
+	if err != nil {
+		return nil, 0, fmt.Errorf("counting pins: %v: %w", err, errInternalServer)
+	}
+
+	return pins, count, nil
 }
 
 func (r *pinRepository) UpdatePin(ctx context.Context, pin UpdatePinRequest) error {

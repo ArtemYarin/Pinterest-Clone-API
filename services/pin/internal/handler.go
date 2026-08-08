@@ -3,7 +3,9 @@ package pin
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/ArtemYarin/pinterest-clone-api/pkg/middleware"
@@ -45,7 +47,7 @@ func (h *PinHandler) CreatePin(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusCreated, resp)
 }
 
-func (h *PinHandler) GetPin(w http.ResponseWriter, r *http.Request) {
+func (h *PinHandler) GetPinByID(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
 	if !IsValidUUID(id) {
@@ -62,6 +64,38 @@ func (h *PinHandler) GetPin(w http.ResponseWriter, r *http.Request) {
 
 	// Response writing
 	WriteJSON(w, 200, resp)
+}
+
+func (h *PinHandler) GetPins(w http.ResponseWriter, r *http.Request) {
+	filters := ParseFilters(r)
+	log.Println(r.URL.Query())
+	log.Println(r.URL.RawQuery)
+	log.Println(filters)
+
+	if err := filters.Validate(); err != nil {
+		WriteJSONError(fmt.Errorf("validate query parameters: %w", err), w)
+	}
+
+	pins, count, err := h.service.GetPins(r.Context(), filters)
+	if err != nil {
+		WriteJSONError(err, w)
+	}
+
+	// Response with metadata
+	response := map[string]interface{}{
+		"data": pins,
+		"metadata": map[string]interface{}{
+			"total":      count,
+			"user_id":    filters.UserID,
+			"search":     filters.Search,
+			"sort_by":    filters.SortBy,
+			"sort_order": filters.SortOrder,
+			"limit":      filters.Limit,
+			"offset":     filters.Offset,
+		},
+	}
+
+	WriteJSON(w, http.StatusOK, response)
 }
 
 func (h *PinHandler) UpdatePin(w http.ResponseWriter, r *http.Request) {
@@ -146,4 +180,80 @@ func Health(db *pgxpool.Pool) http.HandlerFunc {
 			"timestamp":  time.Now().UTC().Format(time.RFC3339),
 		})
 	}
+}
+
+// Helpers
+type PinFilters struct {
+	UserID    string `json:"user_id,omitempty"`
+	Search    string `json:"search,omitempty"`
+	SortBy    string `json:"sort_by,omitempty"`
+	SortOrder string `json:"sort_order,omitempty"` // asc, desc
+	Limit     int    `json:"limit,omitempty"`      // max = 100, default = 20
+	Offset    int    `json:"offset,omitempty"`
+}
+
+func (f *PinFilters) Validate() error {
+	f.setDefault()
+
+	// Validate SortBy - Whitelist
+	allowedSortFields := map[string]bool{
+		"title":      true,
+		"created_at": true,
+		"updated_at": true,
+		"likes":      true,
+		"":           true, // empty is allowed (will use default)
+	}
+	if !allowedSortFields[f.SortBy] {
+		return fmt.Errorf("invalid sort_by field: %s. Allowed: title, created_at, updated_at, likes", f.SortBy)
+	}
+
+	// Validate SortOrder
+	if f.SortOrder != "" && f.SortOrder != "asc" && f.SortOrder != "desc" {
+		return fmt.Errorf("invalid sort_order: %s. Must be 'asc' or 'desc'", f.SortOrder)
+	}
+
+	// Validate Limit
+	if f.Limit < 1 {
+		f.Limit = 20
+	} else if f.Limit > 100 {
+		f.Limit = 100
+	}
+
+	// Validate Offset (must be non-negative)
+	if f.Offset < 0 {
+		f.Offset = 0
+	}
+
+	return nil
+}
+
+func (f *PinFilters) setDefault() {
+	if f.SortBy == "" {
+		f.SortBy = "created_at"
+	}
+
+	if f.SortOrder == "" {
+		f.SortOrder = "desc"
+	}
+}
+
+func ParseFilters(r *http.Request) PinFilters {
+	filters := PinFilters{
+		UserID:    r.URL.Query().Get("user_id"),
+		Search:    r.URL.Query().Get("search"),
+		SortBy:    r.URL.Query().Get("sort_by"),
+		SortOrder: r.URL.Query().Get("sort_order"),
+	}
+
+	if limit := r.URL.Query().Get("limit"); limit != "" {
+		filters.Limit, _ = strconv.Atoi(limit)
+	} else {
+		filters.Limit = 20
+	}
+
+	if offset := r.URL.Query().Get("offset"); offset != "" {
+		filters.Offset, _ = strconv.Atoi(offset)
+	}
+
+	return filters
 }
