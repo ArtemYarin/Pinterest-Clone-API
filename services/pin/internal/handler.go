@@ -3,7 +3,6 @@ package pin
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -68,12 +67,10 @@ func (h *PinHandler) GetPinByID(w http.ResponseWriter, r *http.Request) {
 
 func (h *PinHandler) GetPins(w http.ResponseWriter, r *http.Request) {
 	filters := ParseFilters(r)
-	log.Println(r.URL.Query())
-	log.Println(r.URL.RawQuery)
-	log.Println(filters)
 
 	if err := filters.Validate(); err != nil {
 		WriteJSONError(fmt.Errorf("validate query parameters: %w", err), w)
+		return
 	}
 
 	pins, count, err := h.service.GetPins(r.Context(), filters)
@@ -204,12 +201,22 @@ func (f *PinFilters) Validate() error {
 		"":           true, // empty is allowed (will use default)
 	}
 	if !allowedSortFields[f.SortBy] {
-		return fmt.Errorf("invalid sort_by field: %s. Allowed: title, created_at, updated_at, likes", f.SortBy)
+		valErr := errValidation{
+			Details: map[string]string{
+				"invalid sort_by field": "Allowed: 'title', 'created_at', 'updated_at', 'likes' or empty",
+			},
+		}
+		return fmt.Errorf("invalid sort_by field: %s. Allowed: 'title', 'created_at', 'updated_at', 'likes' or empty: %w", f.SortBy, &valErr)
 	}
 
 	// Validate SortOrder
 	if f.SortOrder != "" && f.SortOrder != "asc" && f.SortOrder != "desc" {
-		return fmt.Errorf("invalid sort_order: %s. Must be 'asc' or 'desc'", f.SortOrder)
+		valErr := errValidation{
+			Details: map[string]string{
+				"invalid sort_order": "Must be 'asc', 'desc' or empty",
+			},
+		}
+		return fmt.Errorf("invalid sort_order: %s. Must be 'asc', 'desc' or empty: %w", f.SortOrder, &valErr)
 	}
 
 	// Validate Limit
