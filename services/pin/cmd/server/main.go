@@ -32,17 +32,28 @@ func main() {
 	}
 	pool, err := postgres.NewPool(dbUrl, config)
 	if err != nil {
-		log.Fatalf("Failed to connect: %v", err)
+		log.Fatalf("Failed to connect to PostgreSQL: %v", err)
 	}
 	defer pool.Close()
-	log.Println("Connected to auth PostgreSQL successfully")
+	log.Println("Connected to PostgreSQL successfully")
 
 	// Validator
 	validate := validator.New()
 
+	// MiniO image storage
+	miniO, err := pin.NewImageStorage(
+		os.Getenv("MINIO_ENDPOINT"),
+		os.Getenv("MINIO_USER"),
+		os.Getenv("MINIO_PASSWORD"),
+		os.Getenv("MINIO_BUCKET"))
+	if err != nil {
+		log.Fatalf("Failed to connect to MiniO: %v", err)
+	}
+	log.Println("Connected to MiniO successfully")
+
 	// Wiring
 	pinRepo := pin.NewPinRepository(pool)
-	pinService := pin.NewPinService(pinRepo, validate)
+	pinService := pin.NewPinService(pinRepo, validate, miniO)
 	pinHandler := pin.NewPinHandler(pinService)
 
 	r := pin.PinRouter(&pinHandler, pool)

@@ -1,5 +1,19 @@
 services:
-  # ============= DATABASES =============
+  # ============= STORAGES =============
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    ports:
+      - "9000:9000"   # S3 API endpoint
+      - "9001:9001"   # Web console
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    restart: always
+
   postgres-pin:
     image: postgres:18
     container_name: postgres_pin
@@ -36,3 +50,4 @@ services:
 
 volumes:
   pgdata-pin:
+  minio-data:

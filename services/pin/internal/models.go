@@ -8,7 +8,6 @@ import (
 
 type CreatePinRequest struct {
 	Title       string  `json:"title"                 validate:"required,min=1,max=255"`
-	Image_url   string  `json:"image_url"              validate:"required,url,max=255"`
 	Description *string `json:"description,omitempty" validate:"omitempty,max=1000"`
 }
 
@@ -28,4 +27,14 @@ type PinResponse struct {
 	Created_at  time.Time `json:"created_at"`
 	Updated_at  time.Time `json:"updated_at"`
 	Likes       int       `json:"likes"`
+}
+
+type UploadImgPinResponse struct {
+	Pin        PinResponse `json:"pin"`
+	Upload_url string      `json:"upload_url"`
+}
+
+type DownloadImgPinResponse struct {
+	Pin          PinResponse `json:"pin"`
+	Download_url string      `json:"download_url"`
 }

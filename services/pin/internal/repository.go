@@ -9,7 +9,7 @@ import (
 )
 
 type PinRepository interface {
-	CreatePin(ctx context.Context, userID uuid.UUID, pin CreatePinRequest) (*PinResponse, error)
+	CreatePin(ctx context.Context, userID uuid.UUID, imageURL string, pin CreatePinRequest) (*PinResponse, error)
 	GetPinByID(ctx context.Context, id string) (*PinResponse, error)
 	GetPins(ctx context.Context, filters PinFilters) ([]*PinResponse, int, error)
 	UpdatePin(ctx context.Context, pin UpdatePinRequest) error
@@ -24,17 +24,17 @@ func NewPinRepository(db *pgxpool.Pool) PinRepository {
 	return &pinRepository{db: db}
 }
 
-func (r *pinRepository) CreatePin(ctx context.Context, userID uuid.UUID, pin CreatePinRequest) (*PinResponse, error) {
+func (r *pinRepository) CreatePin(ctx context.Context, userID uuid.UUID, imageURL string, pin CreatePinRequest) (*PinResponse, error) {
 	var p PinResponse
 	err := r.db.QueryRow(ctx,
 		`INSERT INTO pins (user_id, title, image_url, description)
 		 VALUES ($1, $2, $3, $4)
 		 RETURNING id, user_id, title, image_url, description, created_at, updated_at, likes`,
-		userID, pin.Title, pin.Image_url, pin.Description).
+		userID, pin.Title, imageURL, pin.Description).
 		Scan(&p.Id, &p.User_id, &p.Title, &p.Image_url, &p.Description, &p.Created_at, &p.Updated_at, &p.Likes)
 	if err != nil {
 		if isDuplicateErr(err) {
-			return nil, fmt.Errorf("image url %v already exists: %w", pin.Image_url, errImageURLExists)
+			return nil, fmt.Errorf("image url %v already exists: %w", imageURL, errImageURLExists)
 		}
 		return nil, fmt.Errorf("CreatePin %v: %v", pin, err)
 	}

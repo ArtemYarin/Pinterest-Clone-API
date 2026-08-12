@@ -28,7 +28,7 @@ func (h *PinHandler) CreatePin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Security
+	// User claims
 	claims, ok := middleware.GetUserClaims(r)
 	if !ok {
 		WriteJSONError(errUnauthorized, w)
