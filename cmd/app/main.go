@@ -9,11 +9,20 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/middleware"
 	"github.com/ArtemYarin/pinterest-clone-api/router"
 )
 
 func main() {
-	r := router.SetupRouter()
+	// Rate Limiter
+	rateLimiter := middleware.IPRateLimiter{
+		Buckets:  make(map[string]*middleware.TokenBucket),
+		Rate:     5,
+		Capacity: 10,
+	}
+
+	// Wiring
+	r := router.SetupRouter(&rateLimiter)
 
 	// Server setup
 	srv := http.Server{

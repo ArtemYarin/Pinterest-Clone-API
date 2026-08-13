@@ -7,14 +7,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/middleware"
 	"github.com/go-chi/chi/v5"
 )
 
-func SetupRouter() chi.Router {
+func SetupRouter(rateLimiter *middleware.IPRateLimiter) chi.Router {
 	r := chi.NewRouter()
 
-	r.HandleFunc("/auth*", proxyToAuth) // Auth proxy
-	r.HandleFunc("/pin*", proxyToPin)   // Pin proxy
+	r.Use(rateLimiter.RateLimitingMiddleware)
+
+	r.HandleFunc("/auth*", proxyToAuth)
+	r.HandleFunc("/pin*", proxyToPin)
 
 	return r
 }
