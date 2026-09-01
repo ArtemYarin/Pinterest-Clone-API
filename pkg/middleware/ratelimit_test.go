@@ -7,12 +7,15 @@ import (
 	"time"
 )
 
+// TODO: add headers testing
 func TestRateLimiter_AllowsBurstThenBlocks(t *testing.T) {
-	limiter := &IPRateLimiter{
-		Buckets:  make(map[string]*TokenBucket),
-		Rate:     5,
-		Capacity: 10,
-	}
+	limiter := NewIPRateLimiter(
+		5,
+		10,
+		5*time.Second,
+		10*time.Second,
+	)
+	defer limiter.Stop()
 
 	handler := limiter.RateLimitingMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -50,16 +53,17 @@ func TestRateLimiter_AllowsBurstThenBlocks(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Errorf("after refill wait: expected 200, got %d", rec.Code)
+		t.Errorf("after refill expected 200, got %d", rec.Code)
 	}
 }
 
 func TestRateLimiter_DifferentIPsHaveSeparateBuckets(t *testing.T) {
-	limiter := &IPRateLimiter{
-		Buckets:  make(map[string]*TokenBucket),
-		Rate:     5,
-		Capacity: 2,
-	}
+	limiter := NewIPRateLimiter(
+		5,
+		2,
+		30*time.Second,
+		30*time.Second,
+	)
 	handler := limiter.RateLimitingMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
