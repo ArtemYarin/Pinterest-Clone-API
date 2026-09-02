@@ -1,0 +1,38 @@
+services:
+  # ============= DATABASES =============
+  postgres-interaction:
+    image: postgres:18
+    container_name: postgres_interaction
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - '5434:5432'
+    volumes:
+      - pgdata-interaction:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ============= MIGRATION SERVICES =============
+
+  migrate-users:
+    image: migrate/migrate
+    env_file: .env
+    volumes:
+     - ./migrations:/migrations
+    command: -path /migrations -database  postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-interaction:5434/${POSTGRES_DB}?sslmode=disable up
+    depends_on:
+      postgres-interaction:
+        condition: service_healthy
+    restart: no
+
+# ============= VOLUMES =============
+
+volumes:
+  pgdata-interaction:
