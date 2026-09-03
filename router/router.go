@@ -18,6 +18,7 @@ func SetupRouter(rateLimiter *middleware.IPRateLimiter) chi.Router {
 
 	r.HandleFunc("/auth*", proxyToAuth)
 	r.HandleFunc("/pin*", proxyToPin)
+	r.HandleFunc("/interaction*", proxyToInteraction)
 
 	return r
 }
@@ -77,8 +78,37 @@ func setupPinProxy() *httputil.ReverseProxy {
 	return pinProxy
 }
 
+func setupInteractionProxy() *httputil.ReverseProxy {
+	interactionURL, _ := url.Parse("http://localhost:8083")
+
+	interactionProxy := &httputil.ReverseProxy{
+		Rewrite: func(pr *httputil.ProxyRequest) {
+			pr.SetURL(interactionURL)
+
+			pr.Out.URL.Path = strings.TrimPrefix(pr.In.URL.Path, "/interaction")
+			if pr.Out.URL.Path == "" {
+				pr.Out.URL.Path = "/"
+			}
+
+			pr.Out.Host = interactionURL.Host
+
+			pr.Out.Header.Set("X-Forwarded-Host", pr.In.Host)
+			pr.Out.Header.Set("X-Forwarded-Proto", pr.In.URL.Scheme)
+		},
+
+		Transport: &http.Transport{
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 60,
+			IdleConnTimeout:     90 * time.Second,
+		},
+	}
+
+	return interactionProxy
+}
+
 var authProxy = setupAuthProxy()
 var pinProxy = setupPinProxy()
+var interactionProxy = setupInteractionProxy()
 
 func proxyToAuth(w http.ResponseWriter, r *http.Request) {
 	authProxy.ServeHTTP(w, r)
@@ -86,4 +116,8 @@ func proxyToAuth(w http.ResponseWriter, r *http.Request) {
 
 func proxyToPin(w http.ResponseWriter, r *http.Request) {
 	pinProxy.ServeHTTP(w, r)
+}
+
+func proxyToInteraction(w http.ResponseWriter, r *http.Request) {
+	interactionProxy.ServeHTTP(w, r)
 }

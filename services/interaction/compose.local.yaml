@@ -21,12 +21,12 @@ services:
 
   # ============= MIGRATION SERVICES =============
 
-  migrate-users:
+  migrate-interaction:
     image: migrate/migrate
     env_file: .env
     volumes:
      - ./migrations:/migrations
-    command: -path /migrations -database  postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-interaction:5434/${POSTGRES_DB}?sslmode=disable up
+    command: -path /migrations -database  postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-interaction:5432/${POSTGRES_DB}?sslmode=disable up
     depends_on:
       postgres-interaction:
         condition: service_healthy

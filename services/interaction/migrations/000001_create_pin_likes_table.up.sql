@@ -5,4 +5,4 @@ CREATE TABLE pin_likes (
     PRIMARY KEY (user_id, pin_id)
 );
 
-CREATE INDEX idx_pin_id ON post_likes(pin_id);
+CREATE INDEX idx_pin_id ON pin_likes(pin_id);
