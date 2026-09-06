@@ -9,8 +9,8 @@ import (
 )
 
 type LikeRepository interface {
-	AddLike(ctx context.Context, userID, pinID uuid.UUID) error
-	RemoveLike(ctx context.Context, userID, pinID uuid.UUID) error
+	AddLike(ctx context.Context, userID, pinID uuid.UUID) (bool, error)
+	RemoveLike(ctx context.Context, userID, pinID uuid.UUID) (bool, error)
 }
 
 type likeRepository struct {
@@ -21,23 +21,36 @@ func NewLikeRepository(db *pgxpool.Pool) LikeRepository {
 	return &likeRepository{db: db}
 }
 
-func (r *likeRepository) AddLike(ctx context.Context, userID, pinID uuid.UUID) error {
-	_, err := r.db.Exec(ctx,
+// AddLike adds creates pin_likes instance if it didn't exist before.
+// It returns true if pin_likes was created and false if didn't (for example: conflict)
+func (r *likeRepository) AddLike(ctx context.Context, userID, pinID uuid.UUID) (bool, error) {
+	tag, err := r.db.Exec(ctx,
 		`INSERT INTO pin_likes (user_id, pin_id) VALUES ($1, $2)
 		 ON CONFLICT (user_id, pin_id) DO NOTHING`,
 		userID, pinID)
 	if err != nil {
-		return fmt.Errorf("AddLike user %v pin %v: %w", userID, pinID, err)
+		return false, fmt.Errorf("AddLike user %v pin %v: %w", userID, pinID, err)
 	}
-	return nil
+
+	inserted := false
+
+	if tag.RowsAffected() != 0 {
+		inserted = true
+	}
+	return inserted, nil
 }
 
-func (r *likeRepository) RemoveLike(ctx context.Context, userID, pinID uuid.UUID) error {
-	_, err := r.db.Exec(ctx,
+func (r *likeRepository) RemoveLike(ctx context.Context, userID, pinID uuid.UUID) (bool, error) {
+	tag, err := r.db.Exec(ctx,
 		`DELETE FROM pin_likes WHERE user_id = $1 AND pin_id = $2`,
 		userID, pinID)
 	if err != nil {
-		return fmt.Errorf("RemoveLike user %v pin %v: %w", userID, pinID, err)
+		return false, fmt.Errorf("RemoveLike user %v pin %v: %w", userID, pinID, err)
 	}
-	return nil
+
+	deleted := false
+	if tag.RowsAffected() != 0 {
+		deleted = true
+	}
+	return deleted, nil
 }

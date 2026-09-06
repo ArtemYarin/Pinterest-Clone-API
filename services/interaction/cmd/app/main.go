@@ -13,6 +13,7 @@ import (
 	"github.com/ArtemYarin/pinterest-clone-api/services/interaction-service/internal/likes"
 	"github.com/ArtemYarin/pinterest-clone-api/services/interaction-service/internal/shared/db"
 	"github.com/joho/godotenv"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -21,7 +22,7 @@ func main() {
 		log.Println("file .env not found, using system env vars")
 	}
 
-	// Connecting to db
+	// Postgres
 	dbUrl := db.GetInteractionPostgresDSN()
 	config := postgres.PoolConfig{
 		MaxConns:          25,
@@ -37,9 +38,26 @@ func main() {
 	defer pool.Close()
 	log.Println("Connected to PostgreSQL successfully")
 
+	// Redis
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "localhost:6379"
+	}
+	redisClient := redis.NewClient(&redis.Options{
+		Addr:     redisAddr,
+		Password: os.Getenv("REDIS_PASSWORD"),
+	})
+	log.Println("Connected to Redis successfully")
+
+	// Flush worker
+	w := likes.NewWorker(pool, redisClient, 30*time.Second)
+	w.Start()
+	defer w.Stop()
+	log.Println("Started background worker successfully")
+
 	// Wiring
 	likeRepo := likes.NewLikeRepository(pool)
-	likeService := likes.NewLikeService(likeRepo)
+	likeService := likes.NewLikeService(likeRepo, redisClient)
 	likeHandler := likes.NewLikeHandler(likeService)
 
 	r := likes.LikeRouter(&likeHandler, pool)
