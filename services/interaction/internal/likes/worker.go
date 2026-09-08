@@ -68,7 +68,7 @@ func (w *Worker) SyncToPostgres(ctx context.Context) {
 		}
 
 		_, err = w.db.Exec(ctx,
-			"UPDATE like_counts SET count = count + $1 WHERE id = $2",
+			"UPDATE like_counts SET count = count + $1 WHERE target_id = $2",
 			delta, pinID)
 		if err != nil {
 			// Postgres write failed — give the delta back to Redis

@@ -10,12 +10,16 @@ func LikeRouter(handler *LikeHandler, pool *pgxpool.Pool) chi.Router {
 	r := chi.NewRouter()
 
 	r.Get("/health", Health(pool))
+	r.Get("/{pinID}/like/count", handler.GetLikeCount)
 
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.AuthMiddleware)
 
 		r.Put("/{pinID}/like", handler.AddLike)
 		r.Delete("/{pinID}/like", handler.RemoveLike)
+		r.Get("/{pinID}/like", handler.HasLiked)
+		r.Get("/likes", handler.ListLikedByUser)
+		r.Get("/likes/batch", handler.HasLikedBatch)
 	})
 	return r
 }
