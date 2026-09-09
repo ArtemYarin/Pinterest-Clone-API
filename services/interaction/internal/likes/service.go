@@ -35,8 +35,12 @@ func (s *likeService) AddLike(ctx context.Context, userID, pinID uuid.UUID) erro
 		return fmt.Errorf("add like in repository: %w", err)
 	}
 	if inserted {
-		s.redis.SAdd(ctx, "likes:dirty", pinID.String())
-		s.redis.Incr(ctx, fmt.Sprintf("likes:count:%s", pinID.String()))
+		if err := s.redis.SAdd(ctx, "likes:dirty", pinID.String()).Err(); err != nil {
+			return fmt.Errorf("mark pin dirty in redis: %w", err)
+		}
+		if err := s.redis.Incr(ctx, fmt.Sprintf("likes:count:%s", pinID.String())).Err(); err != nil {
+			return fmt.Errorf("incr like count in redis: %w", err)
+		}
 	}
 	return nil
 }
