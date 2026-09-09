@@ -1,0 +1,808 @@
+openapi: 3.0.3
+info:
+  title: Pinterest Clone API
+  description: >
+    Gateway-facing API for the Pinterest Clone project. The gateway reverse-proxies
+    requests to three backend services (auth, pin, interaction) under the
+    `/auth`, `/pin`, and `/interaction` path prefixes respectively.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+    description: Gateway (proxies to auth:8081, pin:8082, interaction:8083)
+tags:
+  - name: Auth
+    description: User registration, authentication, and profile management
+  - name: Pin
+    description: Pin creation, retrieval, and management
+  - name: Interaction
+    description: Likes on pins
+  - name: Health
+    description: Service health checks
+
+paths:
+  /auth/health:
+    get:
+      tags: [Health]
+      summary: Auth service health check
+      operationId: authHealth
+      responses:
+        "200":
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: Service unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /auth/signup:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      operationId: signup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CredentialsUserRequest"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserWithTokenResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in with email and password
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CredentialsUserRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /auth/{id}:
+    get:
+      tags: [Auth]
+      summary: Get a user by ID
+      operationId: getUserById
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    patch:
+      tags: [Auth]
+      summary: Update a user (requires the caller's own JWT for this user ID)
+      operationId: updateUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          description: Updated successfully
+          content:
+            application/json:
+              schema:
+                type: string
+                example: Updated successfully
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /auth/email/{email}:
+    get:
+      tags: [Auth]
+      summary: Get a user by email
+      operationId: getUserByEmail
+      parameters:
+        - name: email
+          in: path
+          required: true
+          schema:
+            type: string
+            format: email
+      responses:
+        "200":
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /pin/health:
+    get:
+      tags: [Health]
+      summary: Pin service health check
+      operationId: pinHealth
+      responses:
+        "200":
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: Service unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /pin/:
+    get:
+      tags: [Pin]
+      summary: List / search pins
+      operationId: listPins
+      parameters:
+        - name: user_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter pins by owning user
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Full-text search over pin title/description
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+            enum: [title, created_at, updated_at, likes]
+        - name: sort_order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: List of pins
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PinListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      tags: [Pin]
+      summary: Create a new pin
+      operationId: createPin
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePinRequest"
+      responses:
+        "201":
+          description: Pin created; includes a pre-signed upload URL for the image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadImgPinResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /pin/{id}:
+    get:
+      tags: [Pin]
+      summary: Get a pin by ID
+      operationId: getPinById
+      parameters:
+        - $ref: "#/components/parameters/PinId"
+      responses:
+        "200":
+          description: Pin found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PinResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    patch:
+      tags: [Pin]
+      summary: Update a pin (owner only)
+      operationId: updatePin
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PinId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePinRequest"
+      responses:
+        "200":
+          description: Updated successfully
+          content:
+            application/json:
+              schema:
+                type: string
+                example: Updated successfully
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      tags: [Pin]
+      summary: Delete a pin (owner only)
+      operationId: deletePin
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PinId"
+      responses:
+        "200":
+          description: Deleted successfully
+          content:
+            application/json:
+              schema:
+                type: string
+                example: Deleted successfully
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /interaction/health:
+    get:
+      tags: [Health]
+      summary: Interaction service health check
+      operationId: interactionHealth
+      responses:
+        "200":
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: Service unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /interaction/{pinID}/like:
+    put:
+      tags: [Interaction]
+      summary: Like a pin
+      operationId: addLike
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/InteractionPinId"
+      responses:
+        "200":
+          description: Liked successfully
+          content:
+            application/json:
+              schema:
+                type: string
+                example: Liked successfully
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      tags: [Interaction]
+      summary: Unlike a pin
+      operationId: removeLike
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/InteractionPinId"
+      responses:
+        "200":
+          description: Unliked successfully
+          content:
+            application/json:
+              schema:
+                type: string
+                example: Unliked successfully
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    get:
+      tags: [Interaction]
+      summary: Check whether the current user has liked a pin
+      operationId: hasLiked
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/InteractionPinId"
+      responses:
+        "200":
+          description: Like status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HasLikedResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /interaction/{pinID}/like/count:
+    get:
+      tags: [Interaction]
+      summary: Get the like count for a pin
+      operationId: getLikeCount
+      parameters:
+        - $ref: "#/components/parameters/InteractionPinId"
+      responses:
+        "200":
+          description: Like count
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LikeCountResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /interaction/likes:
+    get:
+      tags: [Interaction]
+      summary: List pin IDs liked by the current user
+      operationId: listLikedByUser
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Liked pin IDs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListLikedResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /interaction/likes/batch:
+    get:
+      tags: [Interaction]
+      summary: Check like status for multiple pins at once
+      operationId: hasLikedBatch
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: pin_ids
+          in: query
+          required: true
+          description: Comma-separated list of pin UUIDs
+          schema:
+            type: string
+          example: 3fa85f64-5717-4562-b3fc-2c963f66afa6,3fa85f64-5717-4562-b3fc-2c963f66afa7
+      responses:
+        "200":
+          description: >
+            Map of pin ID to whether the current user has liked it. Pin IDs
+            that don't exist or aren't liked are still included with `false`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HasLikedBatchResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    UserId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PinId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    InteractionPinId:
+      name: pinID
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        service:
+          type: string
+          example: auth-service
+        status:
+          type: string
+          enum: [ok, unhealthy]
+        PostgreSQL:
+          type: string
+          enum: [healthy, unhealthy]
+        timestamp:
+          type: string
+          format: date-time
+
+    CredentialsUserRequest:
+      type: object
+      required: [email, password_hash]
+      properties:
+        email:
+          type: string
+          format: email
+        password_hash:
+          type: string
+          minLength: 8
+          maxLength: 50
+          description: Plaintext password sent by the client (field name reflects server-side storage, not client hashing)
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password_hash:
+          type: string
+          minLength: 8
+          maxLength: 50
+
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    UserWithTokenResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/UserResponse"
+        token:
+          type: string
+
+    TokenResponse:
+      type: object
+      properties:
+        token:
+          type: string
+
+    CreatePinRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 1000
+          nullable: true
+
+    UpdatePinRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        image_url:
+          type: string
+          format: uri
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 1000
+          nullable: true
+
+    PinResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        image_url:
+          type: string
+          format: uri
+        description:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        likes:
+          type: integer
+
+    UploadImgPinResponse:
+      type: object
+      properties:
+        pin:
+          $ref: "#/components/schemas/PinResponse"
+        upload_url:
+          type: string
+          format: uri
+          description: Pre-signed URL the client should PUT the pin image to
+
+    PinListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PinResponse"
+        metadata:
+          type: object
+          properties:
+            total:
+              type: integer
+            user_id:
+              type: string
+              format: uuid
+              nullable: true
+            search:
+              type: string
+              nullable: true
+            sort_by:
+              type: string
+            sort_order:
+              type: string
+            limit:
+              type: integer
+            offset:
+              type: integer
+
+    LikeCountResponse:
+      type: object
+      properties:
+        pin_id:
+          type: string
+          format: uuid
+        count:
+          type: integer
+
+    HasLikedResponse:
+      type: object
+      properties:
+        pin_id:
+          type: string
+          format: uuid
+        liked:
+          type: boolean
+
+    ListLikedResponse:
+      type: object
+      properties:
+        pin_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    HasLikedBatchResponse:
+      type: object
+      description: Map of pin ID (as string key) to liked status
+      additionalProperties:
+        type: boolean
+      example:
+        3fa85f64-5717-4562-b3fc-2c963f66afa6: true
+        3fa85f64-5717-4562-b3fc-2c963f66afa7: false
+
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: string
+          example: "400"
+        message:
+          type: string
+          example: Bad request
+
+    ValidationErrorResponse:
+      type: object
+      properties:
+        code:
+          type: string
+          example: "422"
+        Details:
+          type: object
+          additionalProperties:
+            type: string
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Missing or invalid bearer token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Authenticated but not permitted to perform this action
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: Conflicting resource state (e.g. duplicate email)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ValidationError:
+      description: Request failed validation
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ValidationErrorResponse"
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"

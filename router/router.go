@@ -9,12 +9,26 @@ import (
 
 	"github.com/ArtemYarin/pinterest-clone-api/pkg/middleware"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/cors"
 )
 
 func SetupRouter(rateLimiter *middleware.IPRateLimiter) chi.Router {
 	r := chi.NewRouter()
 
+	r.Use(cors.Handler(cors.Options{
+		// For dev/testing only:
+		AllowedOrigins:   []string{"*"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: true,
+		MaxAge:           300, // cache preflight response for 5 minutes
+	}))
+
 	r.Use(rateLimiter.RateLimitingMiddleware)
+
+	r.Get("/openapi.yaml", serveOpenAPISpec)
+	r.Get("/docs", serveSwaggerUI)
 
 	r.HandleFunc("/auth*", proxyToAuth)
 	r.HandleFunc("/pin*", proxyToPin)
