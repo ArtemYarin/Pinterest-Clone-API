@@ -18,8 +18,8 @@ import (
 
 func main() {
 	// Load .env file
-	if err := godotenv.Load(); err != nil {
-		log.Println("file .env not found, using system env vars")
+	if err := godotenv.Load(".env.dev"); err != nil {
+		log.Println("file .env.dev not found, using system env vars")
 	}
 
 	// Postgres
@@ -39,12 +39,8 @@ func main() {
 	log.Println("Connected to PostgreSQL successfully")
 
 	// Redis
-	redisAddr := os.Getenv("REDIS_ADDR")
-	if redisAddr == "" {
-		redisAddr = "localhost:6379"
-	}
 	redisClient := redis.NewClient(&redis.Options{
-		Addr:     redisAddr,
+		Addr:     os.Getenv("REDIS_ADDR"),
 		Password: os.Getenv("REDIS_PASSWORD"),
 	})
 	log.Println("Connected to Redis successfully")
@@ -64,7 +60,7 @@ func main() {
 
 	// Server setup
 	srv := http.Server{
-		Addr:           ":8083",
+		Addr:           ":" + os.Getenv("INTERACTION_PORT"),
 		Handler:        r,
 		ReadTimeout:    5 * time.Second,
 		WriteTimeout:   10 * time.Second,

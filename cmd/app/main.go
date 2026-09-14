@@ -11,9 +11,15 @@ import (
 
 	"github.com/ArtemYarin/pinterest-clone-api/pkg/middleware"
 	"github.com/ArtemYarin/pinterest-clone-api/router"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	// Load .env file
+	if err := godotenv.Load(".env.dev"); err != nil {
+		log.Println("file .env.dev not found, using system env vars")
+	}
+
 	// Rate Limiter
 	rateLimiter := middleware.IPRateLimiter{
 		Buckets:  make(map[string]*middleware.TokenBucket),
@@ -25,8 +31,9 @@ func main() {
 	r := router.SetupRouter(&rateLimiter)
 
 	// Server setup
+	port := os.Getenv("GATEWAY_PORT")
 	srv := http.Server{
-		Addr:           ":8080",
+		Addr:           ":" + port,
 		Handler:        r,
 		ReadTimeout:    5 * time.Second,
 		WriteTimeout:   10 * time.Second,

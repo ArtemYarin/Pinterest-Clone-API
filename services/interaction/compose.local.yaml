@@ -40,7 +40,7 @@ services:
 
   migrate-interaction:
     image: migrate/migrate
-    env_file: .env
+    env_file: .env.dev
     volumes:
      - ./migrations:/migrations
     command: -path /migrations -database  postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-interaction:5432/${POSTGRES_DB}?sslmode=disable up

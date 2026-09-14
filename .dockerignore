@@ -1,0 +1,15 @@
+.env
+.env.example
+.env.dev
+.env.dev.example
+
+Dockerfile
+compose.yaml
+compose.local.yaml
+
+.gitignore
+.git
+
+*.md
+
+go.work

@@ -23,7 +23,7 @@ services:
 
   migrate-users:
     image: migrate/migrate
-    env_file: .env
+    env_file: .env.dev
     volumes:
      - ./internal/migrations:/migrations
     command: -path /migrations -database  postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-auth:5432/${POSTGRES_DB}?sslmode=disable up

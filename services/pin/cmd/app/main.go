@@ -10,19 +10,19 @@ import (
 	"time"
 
 	"github.com/ArtemYarin/pinterest-clone-api/pkg/postgres"
-	auth "github.com/ArtemYarin/pinterest-clone-api/services/auth-service/internal"
+	pin "github.com/ArtemYarin/pinterest-clone-api/services/pin-service/internal"
 	"github.com/go-playground/validator/v10"
 	"github.com/joho/godotenv"
 )
 
 func main() {
 	// Load .env file
-	if err := godotenv.Load(); err != nil {
-		log.Println("file .env not found, using system env vars")
+	if err := godotenv.Load(".env.dev"); err != nil {
+		log.Println("file .env.dev not found, using system env vars")
 	}
 
 	// Connecting to db
-	dbUrl := auth.GetAuthPostgresDSN()
+	dbUrl := pin.GetPinPostgresDSN()
 	config := postgres.PoolConfig{
 		MaxConns:          25,
 		MinConns:          10,
@@ -32,24 +32,35 @@ func main() {
 	}
 	pool, err := postgres.NewPool(dbUrl, config)
 	if err != nil {
-		log.Fatalf("Failed to connect: %v", err)
+		log.Fatalf("Failed to connect to PostgreSQL: %v", err)
 	}
 	defer pool.Close()
-	log.Println("Connected to auth PostgreSQL successfully")
+	log.Println("Connected to PostgreSQL successfully")
 
 	// Validator
 	validate := validator.New()
 
-	// Wiring
-	userRepo := auth.NewUserRepository(pool)
-	userService := auth.NewUserService(userRepo, validate)
-	userHandler := auth.NewUserHandler(userService)
+	// MiniO image storage
+	miniO, err := pin.NewImageStorage(
+		os.Getenv("MINIO_ENDPOINT"),
+		os.Getenv("MINIO_USER"),
+		os.Getenv("MINIO_PASSWORD"),
+		os.Getenv("MINIO_BUCKET"))
+	if err != nil {
+		log.Fatalf("Failed to connect to MiniO: %v", err)
+	}
+	log.Println("Connected to MiniO successfully")
 
-	r := auth.UserRouter(&userHandler, pool)
+	// Wiring
+	pinRepo := pin.NewPinRepository(pool)
+	pinService := pin.NewPinService(pinRepo, validate, miniO)
+	pinHandler := pin.NewPinHandler(pinService)
+
+	r := pin.PinRouter(&pinHandler, pool)
 
 	// Server setup
 	srv := http.Server{
-		Addr:           ":8081",
+		Addr:           ":" + os.Getenv("PIN_PORT"),
 		Handler:        r,
 		ReadTimeout:    5 * time.Second,
 		WriteTimeout:   10 * time.Second,

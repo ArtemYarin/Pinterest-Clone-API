@@ -1,9 +1,11 @@
 package router
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -22,7 +24,7 @@ func SetupRouter(rateLimiter *middleware.IPRateLimiter) chi.Router {
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,
-		MaxAge:           300, // cache preflight response for 5 minutes
+		MaxAge:           300,
 	}))
 
 	r.Use(rateLimiter.RateLimitingMiddleware)
@@ -30,15 +32,25 @@ func SetupRouter(rateLimiter *middleware.IPRateLimiter) chi.Router {
 	r.Get("/openapi.yaml", serveOpenAPISpec)
 	r.Get("/docs", serveSwaggerUI)
 
-	r.HandleFunc("/auth*", proxyToAuth)
-	r.HandleFunc("/pin*", proxyToPin)
-	r.HandleFunc("/interaction*", proxyToInteraction)
+	authProxy := setupAuthProxy()
+	pinProxy := setupPinProxy()
+	interactionProxy := setupInteractionProxy()
+
+	r.HandleFunc("/auth*", func(w http.ResponseWriter, r *http.Request) {
+		authProxy.ServeHTTP(w, r)
+	})
+	r.HandleFunc("/pin*", func(w http.ResponseWriter, r *http.Request) {
+		pinProxy.ServeHTTP(w, r)
+	})
+	r.HandleFunc("/interaction*", func(w http.ResponseWriter, r *http.Request) {
+		interactionProxy.ServeHTTP(w, r)
+	})
 
 	return r
 }
 
 func setupAuthProxy() *httputil.ReverseProxy {
-	authUrl, _ := url.Parse("http://localhost:8081")
+	authUrl, _ := url.Parse(fmt.Sprintf("http://%s:%s", os.Getenv("AUTH_HOST"), os.Getenv("AUTH_PORT")))
 
 	authProxy := &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
@@ -65,7 +77,7 @@ func setupAuthProxy() *httputil.ReverseProxy {
 }
 
 func setupPinProxy() *httputil.ReverseProxy {
-	pinURL, _ := url.Parse("http://localhost:8082")
+	pinURL, _ := url.Parse(fmt.Sprintf("http://%s:%s", os.Getenv("PIN_HOST"), os.Getenv("PIN_PORT")))
 
 	pinProxy := &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
@@ -93,7 +105,7 @@ func setupPinProxy() *httputil.ReverseProxy {
 }
 
 func setupInteractionProxy() *httputil.ReverseProxy {
-	interactionURL, _ := url.Parse("http://localhost:8083")
+	interactionURL, _ := url.Parse(fmt.Sprintf("http://%s:%s", os.Getenv("INTERACTION_HOST"), os.Getenv("INTERACTION_PORT")))
 
 	interactionProxy := &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
@@ -118,20 +130,4 @@ func setupInteractionProxy() *httputil.ReverseProxy {
 	}
 
 	return interactionProxy
-}
-
-var authProxy = setupAuthProxy()
-var pinProxy = setupPinProxy()
-var interactionProxy = setupInteractionProxy()
-
-func proxyToAuth(w http.ResponseWriter, r *http.Request) {
-	authProxy.ServeHTTP(w, r)
-}
-
-func proxyToPin(w http.ResponseWriter, r *http.Request) {
-	pinProxy.ServeHTTP(w, r)
-}
-
-func proxyToInteraction(w http.ResponseWriter, r *http.Request) {
-	interactionProxy.ServeHTTP(w, r)
 }

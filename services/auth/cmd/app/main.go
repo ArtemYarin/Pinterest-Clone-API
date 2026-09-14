@@ -10,19 +10,19 @@ import (
 	"time"
 
 	"github.com/ArtemYarin/pinterest-clone-api/pkg/postgres"
-	pin "github.com/ArtemYarin/pinterest-clone-api/services/pin-service/internal"
+	auth "github.com/ArtemYarin/pinterest-clone-api/services/auth-service/internal"
 	"github.com/go-playground/validator/v10"
 	"github.com/joho/godotenv"
 )
 
 func main() {
 	// Load .env file
-	if err := godotenv.Load(); err != nil {
+	if err := godotenv.Load(".env.dev"); err != nil {
 		log.Println("file .env not found, using system env vars")
 	}
 
 	// Connecting to db
-	dbUrl := pin.GetPinPostgresDSN()
+	dbUrl := auth.GetAuthPostgresDSN()
 	config := postgres.PoolConfig{
 		MaxConns:          25,
 		MinConns:          10,
@@ -32,35 +32,24 @@ func main() {
 	}
 	pool, err := postgres.NewPool(dbUrl, config)
 	if err != nil {
-		log.Fatalf("Failed to connect to PostgreSQL: %v", err)
+		log.Fatalf("Failed to connect: %v", err)
 	}
 	defer pool.Close()
-	log.Println("Connected to PostgreSQL successfully")
+	log.Println("Connected to auth PostgreSQL successfully")
 
 	// Validator
 	validate := validator.New()
 
-	// MiniO image storage
-	miniO, err := pin.NewImageStorage(
-		os.Getenv("MINIO_ENDPOINT"),
-		os.Getenv("MINIO_USER"),
-		os.Getenv("MINIO_PASSWORD"),
-		os.Getenv("MINIO_BUCKET"))
-	if err != nil {
-		log.Fatalf("Failed to connect to MiniO: %v", err)
-	}
-	log.Println("Connected to MiniO successfully")
-
 	// Wiring
-	pinRepo := pin.NewPinRepository(pool)
-	pinService := pin.NewPinService(pinRepo, validate, miniO)
-	pinHandler := pin.NewPinHandler(pinService)
+	userRepo := auth.NewUserRepository(pool)
+	userService := auth.NewUserService(userRepo, validate)
+	userHandler := auth.NewUserHandler(userService)
 
-	r := pin.PinRouter(&pinHandler, pool)
+	r := auth.UserRouter(&userHandler, pool)
 
 	// Server setup
 	srv := http.Server{
-		Addr:           ":8082",
+		Addr:           ":" + os.Getenv("AUTH_PORT"),
 		Handler:        r,
 		ReadTimeout:    5 * time.Second,
 		WriteTimeout:   10 * time.Second,

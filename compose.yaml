@@ -1,0 +1,214 @@
+services:
+  # === Gateway ===
+  gateway:
+    build: 
+      context: .
+      dockerfile: Dockerfile.gateway
+    container_name: gateway
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "8080:8080"
+
+  # ============= AUTH =============
+  postgres-auth:
+    image: postgres:18
+    container_name: postgres_auth
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${AUTH_POSTGRES_DB}
+      POSTGRES_USER: ${AUTH_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${AUTH_POSTGRES_PASSWORD}
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata-auth:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${AUTH_POSTGRES_USER} -d ${AUTH_POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  migrate-auth:
+    image: migrate/migrate
+    volumes:
+     - ./services/auth/internal/migrations:/migrations
+    command: -path /migrations -database  postgres://${AUTH_POSTGRES_USER}:${AUTH_POSTGRES_PASSWORD}@postgres-auth:5432/${AUTH_POSTGRES_DB}?sslmode=disable up
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+    restart: "no"
+
+  auth-api:
+    build:
+      context: .
+      dockerfile: services/auth/Dockerfile
+    container_name: auth-api
+    restart: unless-stopped
+    depends_on:
+      migrate-auth:
+        condition: service_completed_successfully
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      AUTH_PORT: ${AUTH_PORT}
+      POSTGRES_USER: ${AUTH_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${AUTH_POSTGRES_PASSWORD}
+      POSTGRES_HOST: ${AUTH_POSTGRES_HOST}
+      POSTGRES_PORT: ${AUTH_POSTGRES_PORT}
+      POSTGRES_DB: ${AUTH_POSTGRES_DB}
+    ports:
+      - "8081:8080"
+
+  # ============= PIN =============
+  postgres-pin:
+    image: postgres:18
+    container_name: postgres_pin
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${PIN_POSTGRES_DB}
+      POSTGRES_USER: ${PIN_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${PIN_POSTGRES_PASSWORD}
+    ports:
+      - '5433:5432'
+    volumes:
+      - pgdata-pin:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${PIN_POSTGRES_USER} -d ${PIN_POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  migrate-pin:
+    image: migrate/migrate
+    volumes:
+     - ./services/pin/internal/migrations:/migrations
+    command: -path /migrations -database  postgres://${PIN_POSTGRES_USER}:${PIN_POSTGRES_PASSWORD}@postgres-pin:5432/${PIN_POSTGRES_DB}?sslmode=disable up
+    depends_on:
+      postgres-pin:
+        condition: service_healthy
+    restart: "no"
+
+  pin-api:
+    build:
+      context: .
+      dockerfile: services/pin/Dockerfile
+    container_name: pin-api
+    restart: unless-stopped
+    depends_on:
+      migrate-pin:
+        condition: service_completed_successfully
+      minio:
+        condition: service_healthy
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      PIN_PORT: ${PIN_PORT}
+      POSTGRES_USER: ${PIN_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${PIN_POSTGRES_PASSWORD}
+      POSTGRES_HOST: ${PIN_POSTGRES_HOST}
+      POSTGRES_PORT: ${PIN_POSTGRES_PORT}
+      POSTGRES_DB: ${PIN_POSTGRES_DB}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_USER: ${MINIO_USER}
+      MINIO_PASSWORD: ${MINIO_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET}
+    ports:
+      - "8082:8080"
+
+  # ============= INTERACTION =============
+  postgres-interaction:
+    image: postgres:18
+    container_name: postgres_interaction
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${INTERACTION_POSTGRES_DB}
+      POSTGRES_USER: ${INTERACTION_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${INTERACTION_POSTGRES_PASSWORD}
+    ports:
+      - '5434:5432'
+    volumes:
+      - pgdata-interaction:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${INTERACTION_POSTGRES_USER} -d ${INTERACTION_POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: redis:8.8-alpine
+    container_name: redis-server
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./services/interaction/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf --requirepass ${REDIS_PASSWORD}
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "--no-auth-warning", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  migrate-interaction:
+    image: migrate/migrate
+    volumes:
+     - ./services/interaction/migrations:/migrations
+    command: -path /migrations -database  postgres://${INTERACTION_POSTGRES_USER}:${INTERACTION_POSTGRES_PASSWORD}@postgres-interaction:5432/${INTERACTION_POSTGRES_DB}?sslmode=disable up
+    depends_on:
+      postgres-interaction:
+        condition: service_healthy
+    restart: "no"
+
+  interaction-api:
+    build:
+      context: .
+      dockerfile: services/interaction/Dockerfile
+    container_name: interaction-api
+    restart: unless-stopped
+    depends_on:
+      migrate-interaction:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      INTERACTION_PORT: ${INTERACTION_PORT}
+      POSTGRES_USER: ${INTERACTION_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${INTERACTION_POSTGRES_PASSWORD}
+      POSTGRES_HOST: ${INTERACTION_POSTGRES_HOST}
+      POSTGRES_PORT: ${INTERACTION_POSTGRES_PORT}
+      POSTGRES_DB: ${INTERACTION_POSTGRES_DB}
+      REDIS_ADDR: ${REDIS_ADDR}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    ports:
+      - "8083:8080"
+
+volumes:
+  pgdata-auth:
+  pgdata-pin:
+  minio-data:
+  pgdata-interaction:
+  redis_data:
