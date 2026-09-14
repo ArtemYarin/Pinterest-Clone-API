@@ -29,6 +29,11 @@ type PinResponse struct {
 	Likes        int       `json:"likes"`
 }
 
+type StalePin struct {
+	Id        uuid.UUID `json:"id"`
+	Image_url string    `json:"image_url"`
+}
+
 type UploadImgPinResponse struct {
 	Pin        PinResponse `json:"pin"`
 	Upload_url string      `json:"upload_url"`

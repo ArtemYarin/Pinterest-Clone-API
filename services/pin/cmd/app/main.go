@@ -59,6 +59,18 @@ func main() {
 
 	// Wiring
 	pinRepo := pin.NewPinRepository(pool)
+
+	// Background cleanup worker for stale pending uploads
+	cleanupWorker := pin.NewCleanupWorker(
+		pinRepo, miniO,
+		pin.GetDurationEnv("PIN_CLEANUP_INTERVAL", 10*time.Minute),
+		pin.GetDurationEnv("PIN_CLEANUP_TTL", 60*time.Minute),
+		pin.GetIntEnv("PIN_CLEANUP_BATCH_SIZE", 100),
+	)
+	cleanupWorker.Start()
+	defer cleanupWorker.Stop()
+	log.Println("Started pin cleanup worker successfully")
+
 	pinService := pin.NewPinService(pinRepo, validate, miniO)
 	pinHandler := pin.NewPinHandler(pinService)
 

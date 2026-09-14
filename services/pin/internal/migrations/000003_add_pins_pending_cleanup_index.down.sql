@@ -1,0 +1,1 @@
+DROP INDEX idx_pins_pending_created_at;

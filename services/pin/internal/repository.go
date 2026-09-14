@@ -3,6 +3,7 @@ package pin
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -15,6 +16,7 @@ type PinRepository interface {
 	UpdatePin(ctx context.Context, pin UpdatePinRequest) error
 	DeletePin(ctx context.Context, id string) error
 	UpdateImageStatus(ctx context.Context, id string, status string) error
+	GetStalePendingPins(ctx context.Context, olderThan time.Time, limit int) ([]StalePin, error)
 }
 
 type pinRepository struct {
@@ -191,4 +193,31 @@ func (r *pinRepository) UpdateImageStatus(ctx context.Context, id string, status
 		return fmt.Errorf("id %s not found: %w", id, errPinNotFound)
 	}
 	return nil
+}
+
+func (r *pinRepository) GetStalePendingPins(ctx context.Context, olderThan time.Time, limit int) ([]StalePin, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT id, image_url FROM pins
+		 WHERE image_status = 'pending' AND created_at < $1
+		 ORDER BY created_at ASC
+		 LIMIT $2`,
+		olderThan, limit)
+	if err != nil {
+		return nil, fmt.Errorf("GetStalePendingPins: %w", err)
+	}
+	defer rows.Close()
+
+	var stale []StalePin
+	for rows.Next() {
+		var p StalePin
+		if err := rows.Scan(&p.Id, &p.Image_url); err != nil {
+			return nil, fmt.Errorf("scan stale pin: %w", err)
+		}
+		stale = append(stale, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("scan stale pin rows: %w", err)
+	}
+
+	return stale, nil
 }
