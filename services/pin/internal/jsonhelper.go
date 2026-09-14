@@ -96,6 +96,20 @@ func WriteJSONError(err error, w http.ResponseWriter) {
 			"message": "Forbidden",
 		})
 		return
+	case errors.Is(err, errImageInvalid):
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		json.NewEncoder(w).Encode(map[string]string{
+			"code":    "422",
+			"message": "Uploaded image is missing or failed validation",
+		})
+		return
+	case errors.Is(err, errStorageUnavailable):
+		w.WriteHeader(http.StatusBadGateway)
+		json.NewEncoder(w).Encode(map[string]string{
+			"code":    "502",
+			"message": "Image storage is temporarily unavailable",
+		})
+		return
 	default:
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{

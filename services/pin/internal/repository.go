@@ -14,6 +14,7 @@ type PinRepository interface {
 	GetPins(ctx context.Context, filters PinFilters) ([]*PinResponse, int, error)
 	UpdatePin(ctx context.Context, pin UpdatePinRequest) error
 	DeletePin(ctx context.Context, id string) error
+	UpdateImageStatus(ctx context.Context, id string, status string) error
 }
 
 type pinRepository struct {
@@ -29,9 +30,9 @@ func (r *pinRepository) CreatePin(ctx context.Context, userID uuid.UUID, imageUR
 	err := r.db.QueryRow(ctx,
 		`INSERT INTO pins (user_id, title, image_url, description)
 		 VALUES ($1, $2, $3, $4)
-		 RETURNING id, user_id, title, image_url, description, created_at, updated_at, likes`,
+		 RETURNING id, user_id, title, image_url, image_status, description, created_at, updated_at, likes`,
 		userID, pin.Title, imageURL, pin.Description).
-		Scan(&p.Id, &p.User_id, &p.Title, &p.Image_url, &p.Description, &p.Created_at, &p.Updated_at, &p.Likes)
+		Scan(&p.Id, &p.User_id, &p.Title, &p.Image_url, &p.Image_status, &p.Description, &p.Created_at, &p.Updated_at, &p.Likes)
 	if err != nil {
 		if isDuplicateErr(err) {
 			return nil, fmt.Errorf("image url %v already exists: %w", imageURL, errImageURLExists)
@@ -44,9 +45,9 @@ func (r *pinRepository) CreatePin(ctx context.Context, userID uuid.UUID, imageUR
 func (r *pinRepository) GetPinByID(ctx context.Context, id string) (*PinResponse, error) {
 	var p PinResponse
 	err := r.db.QueryRow(ctx,
-		`SELECT id, user_id, title, image_url, description, created_at, updated_at, likes
+		`SELECT id, user_id, title, image_url, image_status, description, created_at, updated_at, likes
 		 FROM pins WHERE id = $1`, id).
-		Scan(&p.Id, &p.User_id, &p.Title, &p.Image_url, &p.Description, &p.Created_at, &p.Updated_at, &p.Likes)
+		Scan(&p.Id, &p.User_id, &p.Title, &p.Image_url, &p.Image_status, &p.Description, &p.Created_at, &p.Updated_at, &p.Likes)
 	if err != nil {
 		if isNotFoundErr(err) {
 			return nil, fmt.Errorf("id %s not found: %w", id, errPinNotFound)
@@ -58,7 +59,7 @@ func (r *pinRepository) GetPinByID(ctx context.Context, id string) (*PinResponse
 
 func (r *pinRepository) GetPins(ctx context.Context, filters PinFilters) ([]*PinResponse, int, error) {
 	// Query building
-	query := "SELECT id, user_id, title, image_url, description, created_at, updated_at, likes FROM pins WHERE 1=1"
+	query := "SELECT id, user_id, title, image_url, image_status, description, created_at, updated_at, likes FROM pins WHERE image_status = 'confirmed'"
 	args := []interface{}{}
 	argIndex := 1
 
@@ -97,7 +98,7 @@ func (r *pinRepository) GetPins(ctx context.Context, filters PinFilters) ([]*Pin
 	var pins []*PinResponse
 	for rows.Next() {
 		var p PinResponse
-		if err := rows.Scan(&p.Id, &p.User_id, &p.Title, &p.Image_url, &p.Description, &p.Created_at, &p.Updated_at, &p.Likes); err != nil {
+		if err := rows.Scan(&p.Id, &p.User_id, &p.Title, &p.Image_url, &p.Image_status, &p.Description, &p.Created_at, &p.Updated_at, &p.Likes); err != nil {
 			return nil, 0, fmt.Errorf("unable to scan pin: %v: %w", err, errInternalServer)
 		}
 		pins = append(pins, &p)
@@ -108,7 +109,7 @@ func (r *pinRepository) GetPins(ctx context.Context, filters PinFilters) ([]*Pin
 	}
 
 	// Total pins count
-	countQuery := "SELECT COUNT(*) FROM pins WHERE 1=1"
+	countQuery := "SELECT COUNT(*) FROM pins WHERE image_status = 'confirmed'"
 	countArgs := []interface{}{}
 	countArgIndex := 1
 
@@ -144,11 +145,6 @@ func (r *pinRepository) UpdatePin(ctx context.Context, pin UpdatePinRequest) err
 		args = append(args, *pin.Title)
 		argIndex++
 	}
-	if pin.Image_url != nil {
-		query += fmt.Sprintf(", image_url = $%d", argIndex)
-		args = append(args, *pin.Image_url)
-		argIndex++
-	}
 	if pin.Description != nil {
 		query += fmt.Sprintf(", description = $%d", argIndex)
 		args = append(args, *pin.Description)
@@ -179,6 +175,17 @@ func (r *pinRepository) DeletePin(ctx context.Context, id string) error {
 	tag, err := r.db.Exec(ctx, "DELETE FROM pins WHERE id = $1", id)
 	if err != nil {
 		return fmt.Errorf("DeletePin: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("id %s not found: %w", id, errPinNotFound)
+	}
+	return nil
+}
+
+func (r *pinRepository) UpdateImageStatus(ctx context.Context, id string, status string) error {
+	tag, err := r.db.Exec(ctx, "UPDATE pins SET image_status = $1, updated_at = NOW() WHERE id = $2", status, id)
+	if err != nil {
+		return fmt.Errorf("UpdateImageStatus: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
 		return fmt.Errorf("id %s not found: %w", id, errPinNotFound)

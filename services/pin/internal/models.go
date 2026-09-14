@@ -14,19 +14,19 @@ type CreatePinRequest struct {
 type UpdatePinRequest struct {
 	Id          uuid.UUID `json:"-"`
 	Title       *string   `json:"title,omitempty"       validate:"omitempty,min=1,max=255"`
-	Image_url   *string   `json:"image_url,omitempty"   validate:"omitempty,url,max=255"`
 	Description *string   `json:"description,omitempty" validate:"omitempty,max=1000"`
 }
 
 type PinResponse struct {
-	Id          uuid.UUID `json:"id"`
-	User_id     uuid.UUID `json:"user_id"`
-	Title       string    `json:"title"`
-	Image_url   string    `json:"image_url"`
-	Description *string   `json:"description,omitempty"`
-	Created_at  time.Time `json:"created_at"`
-	Updated_at  time.Time `json:"updated_at"`
-	Likes       int       `json:"likes"`
+	Id           uuid.UUID `json:"id"`
+	User_id      uuid.UUID `json:"user_id"`
+	Title        string    `json:"title"`
+	Image_url    string    `json:"image_url"`
+	Image_status string    `json:"image_status"`
+	Description  *string   `json:"description,omitempty"`
+	Created_at   time.Time `json:"created_at"`
+	Updated_at   time.Time `json:"updated_at"`
+	Likes        int       `json:"likes"`
 }
 
 type UploadImgPinResponse struct {

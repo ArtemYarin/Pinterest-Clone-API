@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -41,11 +42,16 @@ func main() {
 	validate := validator.New()
 
 	// MiniO image storage
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	useSSL, _ := strconv.ParseBool(os.Getenv("MINIO_USE_SSL"))
 	miniO, err := pin.NewImageStorage(
+		ctx,
 		os.Getenv("MINIO_ENDPOINT"),
 		os.Getenv("MINIO_USER"),
 		os.Getenv("MINIO_PASSWORD"),
-		os.Getenv("MINIO_BUCKET"))
+		os.Getenv("MINIO_BUCKET"),
+		useSSL)
 	if err != nil {
 		log.Fatalf("Failed to connect to MiniO: %v", err)
 	}
@@ -56,7 +62,7 @@ func main() {
 	pinService := pin.NewPinService(pinRepo, validate, miniO)
 	pinHandler := pin.NewPinHandler(pinService)
 
-	r := pin.PinRouter(&pinHandler, pool)
+	r := pin.PinRouter(&pinHandler, pool, miniO)
 
 	// Server setup
 	srv := http.Server{
@@ -79,7 +85,7 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {

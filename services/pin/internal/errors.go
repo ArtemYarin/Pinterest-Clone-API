@@ -6,6 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/minio/minio-go/v7"
 )
 
 // Sentinel errors
@@ -15,6 +16,8 @@ var errBadRequest = errors.New("bad request error")
 var errUnauthorized = errors.New("unauthorized error")
 var errPinNotFound = errors.New("pin not found error")
 var errInternalServer = errors.New("internal server error")
+var errImageInvalid = errors.New("invalid image error")
+var errStorageUnavailable = errors.New("storage unavailable error")
 
 // Validation error
 type errValidation struct {
@@ -47,4 +50,8 @@ func isDuplicateErr(err error) bool {
 }
 func isNotFoundErr(err error) bool {
 	return errors.Is(err, pgx.ErrNoRows)
+}
+
+func isMinioNotFoundErr(err error) bool {
+	return minio.ToErrorResponse(err).Code == "NoSuchKey"
 }

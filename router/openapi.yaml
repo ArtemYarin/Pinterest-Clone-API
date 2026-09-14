@@ -283,11 +283,11 @@ paths:
         - $ref: "#/components/parameters/PinId"
       responses:
         "200":
-          description: Pin found
+          description: Pin found; includes a pre-signed download URL for the image (only set once the upload has been confirmed)
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PinResponse"
+                $ref: "#/components/schemas/DownloadImgPinResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
@@ -354,6 +354,41 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /pin/{id}/confirm:
+    post:
+      tags: [Pin]
+      summary: Confirm a pin's image upload (owner only)
+      description: >
+        Call after PUT-ing the image to the pre-signed upload_url. Validates the
+        uploaded object's content-type and size server-side; invalid or missing
+        uploads are rejected and the pin is removed.
+      operationId: confirmPinUpload
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PinId"
+      responses:
+        "200":
+          description: Upload confirmed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PinResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          description: Uploaded image is missing or failed validation (content-type/size); the pin has been removed
+        "502":
+          description: Image storage is temporarily unavailable
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -633,10 +668,6 @@ components:
           type: string
           minLength: 1
           maxLength: 255
-        image_url:
-          type: string
-          format: uri
-          maxLength: 255
         description:
           type: string
           maxLength: 1000
@@ -655,7 +686,10 @@ components:
           type: string
         image_url:
           type: string
-          format: uri
+          description: Internal storage object key, not a browsable URL. Use the upload_url/download_url instead.
+        image_status:
+          type: string
+          enum: [pending, confirmed, failed]
         description:
           type: string
           nullable: true
@@ -677,6 +711,16 @@ components:
           type: string
           format: uri
           description: Pre-signed URL the client should PUT the pin image to
+
+    DownloadImgPinResponse:
+      type: object
+      properties:
+        pin:
+          $ref: "#/components/schemas/PinResponse"
+        download_url:
+          type: string
+          format: uri
+          description: Pre-signed URL to view the pin image. Empty until the upload has been confirmed via POST /pin/{id}/confirm.
 
     PinListResponse:
       type: object

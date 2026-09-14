@@ -6,10 +6,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func PinRouter(handler *PinHandler, pinPool *pgxpool.Pool) chi.Router {
+func PinRouter(handler *PinHandler, pinPool *pgxpool.Pool, imgStorage *ImageStorage) chi.Router {
 	r := chi.NewRouter()
 
-	r.Get("/health", Health(pinPool))
+	r.Get("/health", Health(pinPool, imgStorage))
 
 	r.Get("/{id}", handler.GetPinByID)
 	r.Get("/", handler.GetPins)
@@ -20,6 +20,7 @@ func PinRouter(handler *PinHandler, pinPool *pgxpool.Pool) chi.Router {
 		r.Post("/", handler.CreatePin)
 		r.Patch("/{id}", handler.UpdatePin)
 		r.Delete("/{id}", handler.DeletePin)
+		r.Post("/{id}/confirm", handler.ConfirmUpload)
 	})
 	return r
 }

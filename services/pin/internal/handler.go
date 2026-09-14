@@ -65,6 +65,29 @@ func (h *PinHandler) GetPinByID(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, 200, resp)
 }
 
+func (h *PinHandler) ConfirmUpload(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	if !IsValidUUID(id) {
+		WriteJSONError(fmt.Errorf("confirm upload: %w", errBadRequest), w)
+		return
+	}
+
+	claims, ok := middleware.GetUserClaims(r)
+	if !ok {
+		WriteJSONError(errUnauthorized, w)
+		return
+	}
+
+	resp, err := h.service.ConfirmUpload(r.Context(), id, claims.UserID)
+	if err != nil {
+		WriteJSONError(fmt.Errorf("confirm upload: %w", err), w)
+		return
+	}
+
+	WriteJSON(w, http.StatusOK, resp)
+}
+
 func (h *PinHandler) GetPins(w http.ResponseWriter, r *http.Request) {
 	filters := ParseFilters(r)
 
@@ -157,14 +180,22 @@ func (h *PinHandler) DeletePin(w http.ResponseWriter, r *http.Request) {
 }
 
 // Health
-func Health(db *pgxpool.Pool) http.HandlerFunc {
+func Health(db *pgxpool.Pool, imgStorage *ImageStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		code := http.StatusOK
 		status := "ok"
+
 		postgresStatus := "healthy"
 		if err := db.Ping(r.Context()); err != nil {
 			code = http.StatusServiceUnavailable
 			postgresStatus = "unhealthy"
+			status = "unhealthy"
+		}
+
+		minioStatus := "healthy"
+		if err := imgStorage.Ping(r.Context()); err != nil {
+			code = http.StatusServiceUnavailable
+			minioStatus = "unhealthy"
 			status = "unhealthy"
 		}
 
@@ -174,6 +205,7 @@ func Health(db *pgxpool.Pool) http.HandlerFunc {
 			"service":    "pis-service",
 			"status":     status,
 			"PostgreSQL": postgresStatus,
+			"MinIO":      minioStatus,
 			"timestamp":  time.Now().UTC().Format(time.RFC3339),
 		})
 	}
