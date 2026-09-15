@@ -1,8 +1,8 @@
 services:
   # === Gateway ===
   gateway:
-    build: 
-      context: .
+    build:
+      context: ./backend
       dockerfile: Dockerfile.gateway
     container_name: gateway
     restart: unless-stopped
@@ -34,7 +34,7 @@ services:
   migrate-auth:
     image: migrate/migrate
     volumes:
-     - ./services/auth/internal/migrations:/migrations
+     - ./backend/services/auth/internal/migrations:/migrations
     command: -path /migrations -database  postgres://${AUTH_POSTGRES_USER}:${AUTH_POSTGRES_PASSWORD}@postgres-auth:5432/${AUTH_POSTGRES_DB}?sslmode=disable up
     depends_on:
       postgres-auth:
@@ -43,7 +43,7 @@ services:
 
   auth-api:
     build:
-      context: .
+      context: ./backend
       dockerfile: services/auth/Dockerfile
     container_name: auth-api
     restart: unless-stopped
@@ -104,7 +104,7 @@ services:
   migrate-pin:
     image: migrate/migrate
     volumes:
-     - ./services/pin/internal/migrations:/migrations
+     - ./backend/services/pin/internal/migrations:/migrations
     command: -path /migrations -database  postgres://${PIN_POSTGRES_USER}:${PIN_POSTGRES_PASSWORD}@postgres-pin:5432/${PIN_POSTGRES_DB}?sslmode=disable up
     depends_on:
       postgres-pin:
@@ -113,7 +113,7 @@ services:
 
   pin-api:
     build:
-      context: .
+      context: ./backend
       dockerfile: services/pin/Dockerfile
     container_name: pin-api
     restart: unless-stopped
@@ -169,7 +169,7 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-      - ./services/interaction/redis.conf:/usr/local/etc/redis/redis.conf
+      - ./backend/services/interaction/redis.conf:/usr/local/etc/redis/redis.conf
     command: redis-server /usr/local/etc/redis/redis.conf --requirepass ${REDIS_PASSWORD}
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "--no-auth-warning", "ping"]
@@ -180,7 +180,7 @@ services:
   migrate-interaction:
     image: migrate/migrate
     volumes:
-     - ./services/interaction/migrations:/migrations
+     - ./backend/services/interaction/migrations:/migrations
     command: -path /migrations -database  postgres://${INTERACTION_POSTGRES_USER}:${INTERACTION_POSTGRES_PASSWORD}@postgres-interaction:5432/${INTERACTION_POSTGRES_DB}?sslmode=disable up
     depends_on:
       postgres-interaction:
@@ -189,7 +189,7 @@ services:
 
   interaction-api:
     build:
-      context: .
+      context: ./backend
       dockerfile: services/interaction/Dockerfile
     container_name: interaction-api
     restart: unless-stopped
