@@ -141,6 +141,39 @@ services:
     ports:
       - "8082:8080"
 
+  # ============= SEED =============
+  seed-pins:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.seed
+    container_name: seed-pins
+    restart: "no"
+    depends_on:
+      migrate-auth:
+        condition: service_completed_successfully
+      migrate-pin:
+        condition: service_completed_successfully
+      minio:
+        condition: service_healthy
+    environment:
+      AUTH_POSTGRES_USER: ${AUTH_POSTGRES_USER}
+      AUTH_POSTGRES_PASSWORD: ${AUTH_POSTGRES_PASSWORD}
+      AUTH_POSTGRES_HOST: ${AUTH_POSTGRES_HOST}
+      AUTH_POSTGRES_PORT: ${AUTH_POSTGRES_PORT}
+      AUTH_POSTGRES_DB: ${AUTH_POSTGRES_DB}
+      PIN_POSTGRES_USER: ${PIN_POSTGRES_USER}
+      PIN_POSTGRES_PASSWORD: ${PIN_POSTGRES_PASSWORD}
+      PIN_POSTGRES_HOST: ${PIN_POSTGRES_HOST}
+      PIN_POSTGRES_PORT: ${PIN_POSTGRES_PORT}
+      PIN_POSTGRES_DB: ${PIN_POSTGRES_DB}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_USER: ${MINIO_USER}
+      MINIO_PASSWORD: ${MINIO_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET}
+      MINIO_USE_SSL: ${MINIO_USE_SSL}
+      SEED_USER_EMAIL: ${SEED_USER_EMAIL}
+      SEED_USER_PASSWORD: ${SEED_USER_PASSWORD}
+
   # ============= INTERACTION =============
   postgres-interaction:
     image: postgres:18
