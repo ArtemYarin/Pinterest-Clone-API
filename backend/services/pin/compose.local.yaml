@@ -1,17 +1,24 @@
 services:
   # ============= STORAGES =============
-  minio:
-    image: minio/minio:latest
-    container_name: minio
+  garage:
+    image: dxflrs/garage:v2.3.0
+    container_name: garage
     ports:
-      - "9000:9000"   # S3 API endpoint
-      - "9001:9001"   # Web console
+      - "9000:3900"   # S3 API endpoint
     environment:
-      MINIO_ROOT_USER: ${MINIO_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
+      GARAGE_DEFAULT_ACCESS_KEY: ${GARAGE_USER}
+      GARAGE_DEFAULT_SECRET_KEY: ${GARAGE_PASSWORD}
+      GARAGE_DEFAULT_BUCKET: ${GARAGE_BUCKET}
     volumes:
-      - minio-data:/data
-    command: server /data --console-address ":9001"
+      - garage-data:/var/lib/garage
+      - ./garage.toml:/etc/garage.toml:ro
+    command: /garage server --single-node --default-bucket
+    healthcheck:
+      test: ["CMD", "/garage", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: always
 
   postgres-pin:
@@ -50,4 +57,4 @@ services:
 
 volumes:
   pgdata-pin:
-  minio-data:
+  garage-data:

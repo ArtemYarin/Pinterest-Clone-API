@@ -44,13 +44,13 @@ func main() {
 	// MiniO image storage
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	useSSL, _ := strconv.ParseBool(os.Getenv("MINIO_USE_SSL"))
+	useSSL, _ := strconv.ParseBool(os.Getenv("GARAGE_USE_SSL"))
 	miniO, err := pin.NewImageStorage(
 		ctx,
-		os.Getenv("MINIO_ENDPOINT"),
-		os.Getenv("MINIO_USER"),
-		os.Getenv("MINIO_PASSWORD"),
-		os.Getenv("MINIO_BUCKET"),
+		os.Getenv("GARAGE_ENDPOINT"),
+		os.Getenv("GARAGE_USER"),
+		os.Getenv("GARAGE_PASSWORD"),
+		os.Getenv("GARAGE_BUCKET"),
 		useSSL)
 	if err != nil {
 		log.Fatalf("Failed to connect to MiniO: %v", err)

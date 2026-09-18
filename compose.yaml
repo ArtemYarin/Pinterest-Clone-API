@@ -81,21 +81,22 @@ services:
       retries: 5
       start_period: 10s
 
-  minio:
-    image: minio/minio:latest
-    container_name: minio
+  garage:
+    image: dxflrs/garage:v2.3.0
+    container_name: garage
     restart: unless-stopped
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "9000:3900"
     environment:
-      MINIO_ROOT_USER: ${MINIO_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
+      GARAGE_DEFAULT_ACCESS_KEY: ${GARAGE_USER}
+      GARAGE_DEFAULT_SECRET_KEY: ${GARAGE_PASSWORD}
+      GARAGE_DEFAULT_BUCKET: ${GARAGE_BUCKET}
     volumes:
-      - minio-data:/data
-    command: server /data --console-address ":9001"
+      - garage-data:/var/lib/garage
+      - ./garage.toml:/etc/garage.toml:ro
+    command: /garage server --single-node --default-bucket
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "/garage", "status"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -120,7 +121,7 @@ services:
     depends_on:
       migrate-pin:
         condition: service_completed_successfully
-      minio:
+      garage:
         condition: service_healthy
     environment:
       JWT_SECRET: ${JWT_SECRET}
@@ -130,11 +131,11 @@ services:
       POSTGRES_HOST: ${PIN_POSTGRES_HOST}
       POSTGRES_PORT: ${PIN_POSTGRES_PORT}
       POSTGRES_DB: ${PIN_POSTGRES_DB}
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
-      MINIO_USER: ${MINIO_USER}
-      MINIO_PASSWORD: ${MINIO_PASSWORD}
-      MINIO_BUCKET: ${MINIO_BUCKET}
-      MINIO_USE_SSL: ${MINIO_USE_SSL}
+      GARAGE_ENDPOINT: ${GARAGE_ENDPOINT}
+      GARAGE_USER: ${GARAGE_USER}
+      GARAGE_PASSWORD: ${GARAGE_PASSWORD}
+      GARAGE_BUCKET: ${GARAGE_BUCKET}
+      GARAGE_USE_SSL: ${GARAGE_USE_SSL}
       PIN_CLEANUP_INTERVAL: ${PIN_CLEANUP_INTERVAL}
       PIN_CLEANUP_TTL: ${PIN_CLEANUP_TTL}
       PIN_CLEANUP_BATCH_SIZE: ${PIN_CLEANUP_BATCH_SIZE}
@@ -153,7 +154,7 @@ services:
         condition: service_completed_successfully
       migrate-pin:
         condition: service_completed_successfully
-      minio:
+      garage:
         condition: service_healthy
     environment:
       AUTH_POSTGRES_USER: ${AUTH_POSTGRES_USER}
@@ -166,11 +167,11 @@ services:
       PIN_POSTGRES_HOST: ${PIN_POSTGRES_HOST}
       PIN_POSTGRES_PORT: ${PIN_POSTGRES_PORT}
       PIN_POSTGRES_DB: ${PIN_POSTGRES_DB}
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
-      MINIO_USER: ${MINIO_USER}
-      MINIO_PASSWORD: ${MINIO_PASSWORD}
-      MINIO_BUCKET: ${MINIO_BUCKET}
-      MINIO_USE_SSL: ${MINIO_USE_SSL}
+      GARAGE_ENDPOINT: ${GARAGE_ENDPOINT}
+      GARAGE_USER: ${GARAGE_USER}
+      GARAGE_PASSWORD: ${GARAGE_PASSWORD}
+      GARAGE_BUCKET: ${GARAGE_BUCKET}
+      GARAGE_USE_SSL: ${GARAGE_USE_SSL}
       SEED_USER_EMAIL: ${SEED_USER_EMAIL}
       SEED_USER_PASSWORD: ${SEED_USER_PASSWORD}
 
@@ -214,7 +215,7 @@ services:
     image: migrate/migrate
     volumes:
      - ./backend/services/interaction/migrations:/migrations
-    command: -path /migrations -database  postgres://${INTERACTION_POSTGRES_USER}:${INTERACTION_POSTGRES_PASSWORD}@postgres-interaction:5432/${INTERACTION_POSTGRES_DB}?sslmode=disable up
+    command: -path /migrations -database  postgres://${INTERACTION_POSTGRES_USER}:${INTERACTION_POSTGRES_PASSWORD}@${INTERACTION_POSTGRES_HOST}:${INTERACTION_POSTGRES_PORT}/${INTERACTION_POSTGRES_DB}?sslmode=disable up
     depends_on:
       postgres-interaction:
         condition: service_healthy
@@ -246,6 +247,6 @@ services:
 volumes:
   pgdata-auth:
   pgdata-pin:
-  minio-data:
+  garage-data:
   pgdata-interaction:
   redis_data:

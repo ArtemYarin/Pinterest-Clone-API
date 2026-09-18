@@ -42,16 +42,16 @@ func main() {
 	}
 	defer pinPool.Close()
 
-	useSSL, _ := strconv.ParseBool(os.Getenv("MINIO_USE_SSL"))
-	minioClient, err := minio.New(os.Getenv("MINIO_ENDPOINT"), &minio.Options{
-		Creds:  credentials.NewStaticV4(os.Getenv("MINIO_USER"), os.Getenv("MINIO_PASSWORD"), ""),
+	useSSL, _ := strconv.ParseBool(os.Getenv("GARAGE_USE_SSL"))
+	minioClient, err := minio.New(os.Getenv("GARAGE_ENDPOINT"), &minio.Options{
+		Creds:  credentials.NewStaticV4(os.Getenv("GARAGE_USER"), os.Getenv("GARAGE_PASSWORD"), ""),
 		Secure: useSSL,
 	})
 	if err != nil {
 		log.Fatalf("creating minio client: %v", err)
 	}
 
-	bucket := os.Getenv("MINIO_BUCKET")
+	bucket := os.Getenv("GARAGE_BUCKET")
 	if err := ensureBucket(ctx, minioClient, bucket); err != nil {
 		log.Fatalf("ensuring minio bucket: %v", err)
 	}
