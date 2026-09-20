@@ -47,15 +47,16 @@ func main() {
 	useSSL, _ := strconv.ParseBool(os.Getenv("GARAGE_USE_SSL"))
 	miniO, err := pin.NewImageStorage(
 		ctx,
-		os.Getenv("GARAGE_ENDPOINT"),
+		os.Getenv("GARAGE_INTERNAL_ENDPOINT"),
+		os.Getenv("GARAGE_PUBLIC_ENDPOINT"),
 		os.Getenv("GARAGE_USER"),
 		os.Getenv("GARAGE_PASSWORD"),
 		os.Getenv("GARAGE_BUCKET"),
 		useSSL)
 	if err != nil {
-		log.Fatalf("Failed to connect to MiniO: %v", err)
+		log.Fatalf("Failed to connect to Garage: %v", err)
 	}
-	log.Println("Connected to MiniO successfully")
+	log.Println("Connected to Garage successfully")
 
 	// Wiring
 	pinRepo := pin.NewPinRepository(pool)

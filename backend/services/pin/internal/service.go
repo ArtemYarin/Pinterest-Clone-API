@@ -22,7 +22,7 @@ const maxImageSizeBytes = 10 << 20 // 10MB
 type PinService interface {
 	CreatePin(ctx context.Context, userID uuid.UUID, pin CreatePinRequest) (*UploadImgPinResponse, error)
 	GetPinByID(ctx context.Context, id string) (*DownloadImgPinResponse, error)
-	GetPins(ctx context.Context, filters PinFilters) ([]*PinResponse, int, error)
+	GetPins(ctx context.Context, filters PinFilters) ([]DownloadImgPinResponse, int, error)
 	UpdatePin(ctx context.Context, id string, userID uuid.UUID, pin UpdatePinRequest) error
 	DeletePin(ctx context.Context, id string, userID uuid.UUID) error
 	ConfirmUpload(ctx context.Context, id string, userID uuid.UUID) (*PinResponse, error)
@@ -88,12 +88,29 @@ func (s *pinService) GetPinByID(ctx context.Context, id string) (*DownloadImgPin
 	}, nil
 }
 
-func (s *pinService) GetPins(ctx context.Context, filters PinFilters) ([]*PinResponse, int, error) {
+func (s *pinService) GetPins(ctx context.Context, filters PinFilters) ([]DownloadImgPinResponse, int, error) {
 	pins, count, err := s.repo.GetPins(ctx, filters)
 	if err != nil {
 		return nil, 0, fmt.Errorf("get pins from repository: %w", err)
 	}
-	return pins, count, nil
+
+	var resp []DownloadImgPinResponse
+
+	if count > 0 {
+		for _, pin := range pins {
+			downloadURL, err := s.imgStorage.GenerateDownloadURL(ctx, pin.Image_url, 1*time.Hour)
+			if err != nil {
+				return nil, 0, fmt.Errorf("generate download url for pin: %s: %w", pin.Id, err)
+			}
+			p := DownloadImgPinResponse{
+				Pin:          pin,
+				Download_url: downloadURL,
+			}
+			resp = append(resp, p)
+		}
+	}
+
+	return resp, count, nil
 }
 
 func (s *pinService) UpdatePin(ctx context.Context, id string, userID uuid.UUID, pin UpdatePinRequest) error {

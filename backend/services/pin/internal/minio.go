@@ -11,15 +11,29 @@ import (
 )
 
 type ImageStorage struct {
-	client *minio.Client
-	bucket string
+	client        *minio.Client
+	presignClient *minio.Client
+	bucket        string
 }
 
-func NewImageStorage(ctx context.Context, endpoint, accessKey, secretKey, bucket string, useSSL bool) (*ImageStorage, error) {
-	// Build an HTTP client
-	client, err := minio.New(endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
+func NewImageStorage(ctx context.Context, internalEndpoint, publicEndpoint, accessKey, secretKey, bucket string, useSSL bool) (*ImageStorage, error) {
+	creds := credentials.NewStaticV4(accessKey, secretKey, "")
+
+	// Client for real backend<->Garage traffic, uses Docker network
+	client, err := minio.New(internalEndpoint, &minio.Options{
+		Creds:  creds,
 		Secure: useSSL,
+		Region: "garage",
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Client used ONLY to build presigned URLs used outside Docker
+	presignClient, err := minio.New(publicEndpoint, &minio.Options{
+		Creds:  creds,
+		Secure: useSSL,
+		Region: "garage",
 	})
 	if err != nil {
 		return nil, err
@@ -28,20 +42,20 @@ func NewImageStorage(ctx context.Context, endpoint, accessKey, secretKey, bucket
 	// Initialize bucket if doesn't exist
 	exists, err := client.BucketExists(ctx, bucket)
 	if err != nil {
-		return nil, fmt.Errorf("check MiniO bucket exists: %w", err)
+		return nil, fmt.Errorf("check Garage bucket exists: %w", err)
 	}
 	if !exists {
 		err = client.MakeBucket(ctx, bucket, minio.MakeBucketOptions{})
 		if err != nil {
-			return nil, fmt.Errorf("initialize MiniO bucket: %w", err)
+			return nil, fmt.Errorf("initialize Garage bucket: %w", err)
 		}
 	}
 
-	return &ImageStorage{client: client, bucket: bucket}, nil
+	return &ImageStorage{client: client, presignClient: presignClient, bucket: bucket}, nil
 }
 
 func (s *ImageStorage) GenerateUploadURL(ctx context.Context, objectKey string, expiry time.Duration) (string, error) {
-	url, err := s.client.PresignedPutObject(ctx, s.bucket, objectKey, expiry)
+	url, err := s.presignClient.PresignedPutObject(ctx, s.bucket, objectKey, expiry)
 	if err != nil {
 		return "", err
 	}
@@ -53,7 +67,7 @@ func (s *ImageStorage) GenerateDownloadURL(ctx context.Context, objectKey string
 	reqParams := make(url.Values)
 	reqParams.Set("response-content-disposition", "inline")
 
-	url, err := s.client.PresignedGetObject(ctx, s.bucket, objectKey, expiry, reqParams)
+	url, err := s.presignClient.PresignedGetObject(ctx, s.bucket, objectKey, expiry, reqParams)
 	if err != nil {
 		return "", err
 	}

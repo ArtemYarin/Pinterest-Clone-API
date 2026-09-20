@@ -12,7 +12,7 @@ import (
 type PinRepository interface {
 	CreatePin(ctx context.Context, userID uuid.UUID, imageURL string, pin CreatePinRequest) (*PinResponse, error)
 	GetPinByID(ctx context.Context, id string) (*PinResponse, error)
-	GetPins(ctx context.Context, filters PinFilters) ([]*PinResponse, int, error)
+	GetPins(ctx context.Context, filters PinFilters) ([]PinResponse, int, error)
 	UpdatePin(ctx context.Context, pin UpdatePinRequest) error
 	DeletePin(ctx context.Context, id string) error
 	UpdateImageStatus(ctx context.Context, id string, status string) error
@@ -59,7 +59,7 @@ func (r *pinRepository) GetPinByID(ctx context.Context, id string) (*PinResponse
 	return &p, nil
 }
 
-func (r *pinRepository) GetPins(ctx context.Context, filters PinFilters) ([]*PinResponse, int, error) {
+func (r *pinRepository) GetPins(ctx context.Context, filters PinFilters) ([]PinResponse, int, error) {
 	// Query building
 	query := "SELECT id, user_id, title, image_url, image_status, description, created_at, updated_at, likes FROM pins WHERE image_status = 'confirmed'"
 	args := []interface{}{}
@@ -97,13 +97,13 @@ func (r *pinRepository) GetPins(ctx context.Context, filters PinFilters) ([]*Pin
 	}
 	defer rows.Close()
 
-	var pins []*PinResponse
+	var pins []PinResponse
 	for rows.Next() {
 		var p PinResponse
 		if err := rows.Scan(&p.Id, &p.User_id, &p.Title, &p.Image_url, &p.Image_status, &p.Description, &p.Created_at, &p.Updated_at, &p.Likes); err != nil {
 			return nil, 0, fmt.Errorf("unable to scan pin: %v: %w", err, errInternalServer)
 		}
-		pins = append(pins, &p)
+		pins = append(pins, p)
 	}
 
 	if err := rows.Err(); err != nil {
