@@ -11,21 +11,45 @@ type PinSeed struct {
 
 var pinSeeds = []PinSeed{
 	{
+		Slug:        "contrasting-volcano",
+		Filename:    "pexels-clive-kim-2523249-6307488.jpg",
+		Title:       "Contrasting Volcano",
+		Description: "A dramatic volcano eruption in Guatemala beneath a star-filled night sky, showcasing nature's power.",
+	},
+	{
+		Slug:        "mist-valley",
+		Filename:    "pexels-eberhardgross-12365962.jpg",
+		Title:       "Mist valley",
+		Description: "A wide valley landscape covered in mist.",
+	},
+	{
+		Slug:        "lake-braies",
+		Filename:    "pexels-francesco-ungaro-1525041.jpg",
+		Title:       "Lake Braies",
+		Description: "A breathtaking view of Lake Braies with mountain reflection in the Italian Alps. Ideal for nature lovers.",
+	},
+	{
+		Slug:        "aerial-photo",
+		Filename:    "pexels-leonhard-niederwimmer-2156971331-38754765.jpg",
+		Title:       "Aerial photo",
+		Description: "Aerial view of a picturesque hilly landscape in Upper Austria at sunset with glowing fields and forests.",
+	},
+	{
 		Slug:        "turquoise-sea-foam",
 		Filename:    "pexels-cottonbro-9860899.jpg",
 		Title:       "Turquoise Sea Foam",
 		Description: "Close-up of frothy waves in brilliant turquoise water.",
 	},
 	{
-		Slug:        "stalactite-cavern",
+		Slug:        "golden-desert-dunes",
 		Filename:    "pexels-francesco-ungaro-17288260.jpg",
 		Title:       "Stalactite Cavern",
 		Description: "Rippling limestone formations lit in warm and cool tones deep underground.",
 	},
 	{
-		Slug:        "golden-desert-dunes",
+		Slug:        "stalactite-cavern",
 		Filename:    "pexels-francesco-ungaro-998653.jpg",
-		Title:       "Golden Desert Dunes",
+		Title:       "Stalactite cavern",
 		Description: "Sweeping sand dunes glowing gold under a clear desert sky.",
 	},
 	{
@@ -35,9 +59,9 @@ var pinSeeds = []PinSeed{
 		Description: "A scattered deck of playing cards with the joker on top.",
 	},
 	{
-		Slug:        "neon-light-painting",
+		Slug:        "adorable-sea",
 		Filename:    "pexels-kienvirak-5213752.jpg",
-		Title:       "Neon Light Painting",
+		Title:       "Adorable sea",
 		Description: "A figure caught mid-motion inside swirling blue light trails.",
 	},
 	{
@@ -68,6 +92,6 @@ var pinSeeds = []PinSeed{
 		Slug:        "cavern-walkway",
 		Filename:    "pexels-the-daphne-lens-2151762624-37691534.jpg",
 		Title:       "Cavern Walkway",
-		Description: "A metal walkway winds through a cave hung with pale stalactites.",
+		Description: "Close-up of frothy waves in brilliant turquoise water.",
 	},
 }
