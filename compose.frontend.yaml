@@ -1,0 +1,12 @@
+services:
+    react:
+      build:
+        context: ./frontend
+        dockerfile: Dockerfile
+        args:
+          API_PORT: ${API_PORT}
+          API_HOST: ${API_HOST}
+      container_name: react
+      restart: unless-stopped
+      ports:
+        - "8084:80"

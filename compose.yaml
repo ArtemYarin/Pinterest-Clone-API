@@ -86,7 +86,7 @@ services:
     container_name: garage
     restart: unless-stopped
     ports:
-      - "9000:3900"
+      - "3900:3900"
     environment:
       GARAGE_DEFAULT_ACCESS_KEY: ${GARAGE_USER}
       GARAGE_DEFAULT_SECRET_KEY: ${GARAGE_PASSWORD}
@@ -97,7 +97,7 @@ services:
     command: /garage server --single-node --default-bucket
     healthcheck:
       test: ["CMD", "/garage", "status"]
-      interval: 5s
+      interval: 30s
       timeout: 5s
       retries: 5
       start_period: 10s
@@ -131,7 +131,8 @@ services:
       POSTGRES_HOST: ${PIN_POSTGRES_HOST}
       POSTGRES_PORT: ${PIN_POSTGRES_PORT}
       POSTGRES_DB: ${PIN_POSTGRES_DB}
-      GARAGE_ENDPOINT: ${GARAGE_ENDPOINT}
+      GARAGE_INTERNAL_ENDPOINT: ${GARAGE_INTERNAL_ENDPOINT}
+      GARAGE_PUBLIC_ENDPOINT: ${GARAGE_PUBLIC_ENDPOINT}
       GARAGE_USER: ${GARAGE_USER}
       GARAGE_PASSWORD: ${GARAGE_PASSWORD}
       GARAGE_BUCKET: ${GARAGE_BUCKET}
@@ -167,7 +168,7 @@ services:
       PIN_POSTGRES_HOST: ${PIN_POSTGRES_HOST}
       PIN_POSTGRES_PORT: ${PIN_POSTGRES_PORT}
       PIN_POSTGRES_DB: ${PIN_POSTGRES_DB}
-      GARAGE_ENDPOINT: ${GARAGE_ENDPOINT}
+      GARAGE_ENDPOINT: ${GARAGE_INTERNAL_ENDPOINT}
       GARAGE_USER: ${GARAGE_USER}
       GARAGE_PASSWORD: ${GARAGE_PASSWORD}
       GARAGE_BUCKET: ${GARAGE_BUCKET}
