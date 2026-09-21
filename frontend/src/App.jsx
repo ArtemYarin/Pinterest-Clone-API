@@ -1,12 +1,7 @@
-import PinGrid from './features/PinGrid'
+import PinPage from './pages/PinPage'
 
 function App() {
-  return (
-    <div>
-      <h1>Random Pin</h1>
-      <PinGrid />
-    </div>
-  )
+  return <PinPage />
 }
 
 export default App
