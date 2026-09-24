@@ -5,4 +5,5 @@ use (
 	./services/auth
 	./services/pin
 	./services/interaction
+	./services/profile
 )

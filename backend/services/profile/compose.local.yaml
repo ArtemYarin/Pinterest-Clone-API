@@ -1,0 +1,77 @@
+services:
+  # ============= STORAGES =============
+  garage:
+    image: dxflrs/garage:v2.3.0
+    container_name: garage
+    ports:
+      - "9000:3900"   # S3 API endpoint
+    environment:
+      GARAGE_DEFAULT_ACCESS_KEY: ${GARAGE_USER}
+      GARAGE_DEFAULT_SECRET_KEY: ${GARAGE_PASSWORD}
+      GARAGE_DEFAULT_BUCKET: ${GARAGE_BUCKET}
+    volumes:
+      - garage-data:/var/lib/garage
+      - ./garage.toml:/etc/garage.toml:ro
+    command: /garage server --single-node --default-bucket
+    healthcheck:
+      test: ["CMD", "/garage", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: always
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  postgres-profile:
+    image: postgres:18
+    container_name: postgres_profile
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - '5435:5432'
+    volumes:
+      - pgdata-profile:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ============= MIGRATION SERVICES =============
+
+  migrate-profiles:
+    image: migrate/migrate
+    env_file: .env.dev
+    volumes:
+     - ./internal/migrations:/migrations
+    command: -path /migrations -database  postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-profile:5432/${POSTGRES_DB}?sslmode=disable up
+    depends_on:
+      postgres-profile:
+        condition: service_healthy
+    restart: no
+
+# ============= VOLUMES =============
+
+volumes:
+  pgdata-profile:
+  garage-data:

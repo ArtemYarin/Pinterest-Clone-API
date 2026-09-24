@@ -2,12 +2,24 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"regexp"
+	"strings"
+	"time"
 
 	"github.com/ArtemYarin/pinterest-clone-api/pkg/jwt"
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/rabbitmq"
 	"github.com/ArtemYarin/pinterest-clone-api/services/auth-service/internal/password"
 	"github.com/go-playground/validator/v10"
+	rmq "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp"
 )
+
+// EventPublisher is the subset of *rabbitmq.Publisher the auth service needs,
+// kept as an interface so it can be swapped/mocked like UserRepository.
+type EventPublisher interface {
+	Publish(ctx context.Context, routingKey string, payload any) error
+}
 
 type UserService interface {
 	RegisterUser(ctx context.Context, user CredentialsUserRequest) (*UserWithTokenResponse, error)
@@ -18,12 +30,13 @@ type UserService interface {
 }
 
 type userService struct {
-	repo     UserRepository
-	validate *validator.Validate
+	repo      UserRepository
+	validate  *validator.Validate
+	publisher *rmq.Publisher
 }
 
-func NewUserService(repo UserRepository, validate *validator.Validate) UserService {
-	return &userService{repo: repo, validate: validate}
+func NewUserService(repo UserRepository, validate *validator.Validate, publisher *rmq.Publisher) UserService {
+	return &userService{repo: repo, validate: validate, publisher: publisher}
 }
 
 func (s *userService) RegisterUser(ctx context.Context, user CredentialsUserRequest) (*UserWithTokenResponse, error) {
@@ -57,6 +70,31 @@ func (s *userService) RegisterUser(ctx context.Context, user CredentialsUserRequ
 	token, err := jwt.GenerateToken(u.Id)
 	if err != nil {
 		return nil, fmt.Errorf("generate token: %w:", err)
+	}
+
+	// Publish registration event for profile-service to consume.
+	// A publish failure shouldn't fail signup, since the two services are
+	// meant to stay loosely coupled.
+	if s.publisher != nil {
+		evt := rabbitmq.UserRegisteredEvent{ // pkg dependecy
+			UserID:            u.Id,
+			Email:             u.Email,
+			SuggestedUsername: deriveUsernameFromEmail(u.Email),
+			OccurredAt:        time.Now().UTC(),
+		}
+		body, err := json.Marshal(evt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal user.registered event for user %s: %v", u.Id, err)
+		}
+		res, err := s.publisher.Publish(ctx, rmq.NewMessage(body))
+		if err != nil {
+			return nil, fmt.Errorf("failed to publish user.registered event for user %s: %v", u.Id, err)
+		}
+		switch res.Outcome.(type) {
+		case *rmq.StateAccepted:
+		default:
+			return nil, fmt.Errorf("unexpected publish outcome: %v", res.Outcome)
+		}
 	}
 
 	return &UserWithTokenResponse{
@@ -145,4 +183,24 @@ func (s *userService) UpdateUser(ctx context.Context, user UpdateUserRequest) er
 		return fmt.Errorf("update user in repository: %w", err)
 	}
 	return nil
+}
+
+var usernameSanitizeRegex = regexp.MustCompile(`[^a-z0-9_]`)
+
+// deriveUsernameFromEmail builds a default profile username from the local
+// part of an email address (e.g. "artem" from "artem@example.com").
+func deriveUsernameFromEmail(email string) string {
+	local := email
+	if i := strings.Index(email, "@"); i >= 0 {
+		local = email[:i]
+	}
+
+	cleaned := usernameSanitizeRegex.ReplaceAllString(strings.ToLower(local), "")
+	if len(cleaned) > 30 {
+		cleaned = cleaned[:30]
+	}
+	if len(cleaned) < 3 {
+		cleaned = "user"
+	}
+	return cleaned
 }

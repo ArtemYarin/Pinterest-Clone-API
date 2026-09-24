@@ -13,6 +13,7 @@ import (
 	auth "github.com/ArtemYarin/pinterest-clone-api/services/auth-service/internal"
 	"github.com/go-playground/validator/v10"
 	"github.com/joho/godotenv"
+	rmq "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp"
 )
 
 func main() {
@@ -40,9 +41,35 @@ func main() {
 	// Validator
 	validate := validator.New()
 
+	// RabbitMQ publisher for user.registered events.
+	// Context and connection.
+	ctx := context.Background()
+	env := rmq.NewEnvironment(os.Getenv("RABBITMQ_URL"), nil)
+	conn, err := env.NewConnection(ctx)
+	if err != nil {
+		log.Fatalf("Failed to connect to RabbitMQ: %v", err)
+	}
+	log.Println("Connected to RabbitMQ successfully")
+	defer func() {
+		_ = env.CloseConnections(context.Background())
+	}()
+
+	// Declare queue
+	_, err = conn.Management().DeclareQueue(ctx, &rmq.QuorumQueueSpecification{Name: "userCreated"})
+	if err != nil {
+		log.Fatalf("Failed to declare a queue: %v", err)
+	}
+
+	// Publisher
+	publisher, err := conn.NewPublisher(ctx, &rmq.QueueAddress{Queue: "userCreated"}, nil)
+	if err != nil {
+		log.Fatalf("Failed to create publisher: %v", err)
+	}
+	defer func() { _ = publisher.Close(context.Background()) }()
+
 	// Wiring
 	userRepo := auth.NewUserRepository(pool)
-	userService := auth.NewUserService(userRepo, validate)
+	userService := auth.NewUserService(userRepo, validate, publisher)
 	userHandler := auth.NewUserHandler(userService)
 
 	r := auth.UserRouter(&userHandler, pool)

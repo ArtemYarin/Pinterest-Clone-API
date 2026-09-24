@@ -31,6 +31,23 @@ services:
       retries: 5
       start_period: 10s
 
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    container_name: rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   migrate-auth:
     image: migrate/migrate
     volumes:
@@ -50,6 +67,8 @@ services:
     depends_on:
       migrate-auth:
         condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
     environment:
       JWT_SECRET: ${JWT_SECRET}
       AUTH_PORT: ${AUTH_PORT}
@@ -58,6 +77,7 @@ services:
       POSTGRES_HOST: ${AUTH_POSTGRES_HOST}
       POSTGRES_PORT: ${AUTH_POSTGRES_PORT}
       POSTGRES_DB: ${AUTH_POSTGRES_DB}
+      RABBITMQ_URL: ${RABBITMQ_URL}
     ports:
       - "8081:8080"
 
@@ -245,9 +265,71 @@ services:
     ports:
       - "8083:8080"
 
+  # ============= PROFILE =============
+  postgres-profile:
+    image: postgres:18
+    container_name: postgres_profile
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${PROFILE_POSTGRES_DB}
+      POSTGRES_USER: ${PROFILE_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${PROFILE_POSTGRES_PASSWORD}
+    ports:
+      - '5435:5432'
+    volumes:
+      - pgdata-profile:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${PROFILE_POSTGRES_USER} -d ${PROFILE_POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  migrate-profile:
+    image: migrate/migrate
+    volumes:
+     - ./backend/services/profile/internal/migrations:/migrations
+    command: -path /migrations -database  postgres://${PROFILE_POSTGRES_USER}:${PROFILE_POSTGRES_PASSWORD}@postgres-profile:5432/${PROFILE_POSTGRES_DB}?sslmode=disable up
+    depends_on:
+      postgres-profile:
+        condition: service_healthy
+    restart: "no"
+
+  profile-api:
+    build:
+      context: ./backend
+      dockerfile: services/profile/Dockerfile
+    container_name: profile-api
+    restart: unless-stopped
+    depends_on:
+      migrate-profile:
+        condition: service_completed_successfully
+      garage:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      PROFILE_PORT: ${PROFILE_PORT}
+      POSTGRES_USER: ${PROFILE_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${PROFILE_POSTGRES_PASSWORD}
+      POSTGRES_HOST: ${PROFILE_POSTGRES_HOST}
+      POSTGRES_PORT: ${PROFILE_POSTGRES_PORT}
+      POSTGRES_DB: ${PROFILE_POSTGRES_DB}
+      GARAGE_INTERNAL_ENDPOINT: ${GARAGE_INTERNAL_ENDPOINT}
+      GARAGE_PUBLIC_ENDPOINT: ${GARAGE_PUBLIC_ENDPOINT}
+      GARAGE_USER: ${GARAGE_USER}
+      GARAGE_PASSWORD: ${GARAGE_PASSWORD}
+      GARAGE_BUCKET: ${GARAGE_BUCKET}
+      GARAGE_USE_SSL: ${GARAGE_USE_SSL}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+    ports:
+      - "8084:8080"
+
 volumes:
   pgdata-auth:
   pgdata-pin:
   garage-data:
   pgdata-interaction:
   redis_data:
+  pgdata-profile:

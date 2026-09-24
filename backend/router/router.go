@@ -35,6 +35,7 @@ func SetupRouter(rateLimiter *middleware.IPRateLimiter) chi.Router {
 	authProxy := setupAuthProxy()
 	pinProxy := setupPinProxy()
 	interactionProxy := setupInteractionProxy()
+	profileProxy := setupProfileProxy()
 
 	r.HandleFunc("/auth*", func(w http.ResponseWriter, r *http.Request) {
 		authProxy.ServeHTTP(w, r)
@@ -44,6 +45,9 @@ func SetupRouter(rateLimiter *middleware.IPRateLimiter) chi.Router {
 	})
 	r.HandleFunc("/interaction*", func(w http.ResponseWriter, r *http.Request) {
 		interactionProxy.ServeHTTP(w, r)
+	})
+	r.HandleFunc("/profile*", func(w http.ResponseWriter, r *http.Request) {
+		profileProxy.ServeHTTP(w, r)
 	})
 
 	return r
@@ -102,6 +106,34 @@ func setupPinProxy() *httputil.ReverseProxy {
 	}
 
 	return pinProxy
+}
+
+func setupProfileProxy() *httputil.ReverseProxy {
+	profileURL, _ := url.Parse(fmt.Sprintf("http://%s:%s", os.Getenv("PROFILE_HOST"), os.Getenv("PROFILE_PORT")))
+
+	profileProxy := &httputil.ReverseProxy{
+		Rewrite: func(pr *httputil.ProxyRequest) {
+			pr.SetURL(profileURL)
+
+			pr.Out.URL.Path = strings.TrimPrefix(pr.In.URL.Path, "/profile")
+			if pr.Out.URL.Path == "" {
+				pr.Out.URL.Path = "/"
+			}
+
+			pr.Out.Host = profileURL.Host
+
+			pr.Out.Header.Set("X-Forwarded-Host", pr.In.Host)
+			pr.Out.Header.Set("X-Forwarded-Proto", pr.In.URL.Scheme)
+		},
+
+		Transport: &http.Transport{
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 60,
+			IdleConnTimeout:     90 * time.Second,
+		},
+	}
+
+	return profileProxy
 }
 
 func setupInteractionProxy() *httputil.ReverseProxy {
