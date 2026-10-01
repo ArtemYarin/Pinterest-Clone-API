@@ -1,1 +1,50 @@
-@import "tailwindcss";
+@import 'tailwindcss';
+
+@theme {
+  /* Dark mode (default) */
+  --color-bg: #0b1210;
+  --color-card: #1f3329;
+  --color-border: #898d8b;
+  --color-text: #e8f5ee;
+  --color-accent: #41ecad;
+
+  --color-bg-focus: #1c2824;
+  --color-card-focus: #32483e;
+  --color-border: #d5dad7;
+  --color-accent-focus: #62f5dd;
+
+  /* Padding */
+  --spacing-button: 0.75rem;
+  --spacing-card: 3rem;
+
+  /* Fonts */
+  --font-display: 'Space Grotesk', sans-serif; /* headings */
+  --font-body: 'Inter', sans-serif; /* paragraphs */
+
+  /* Sizes */
+  --radius-button: 12px;
+  --radius-card: 16px;
+  --container-content: 72rem;
+
+  /* Font sizes */
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-big: 1.2rem;
+  --text-title: 2rem;
+
+  /* Motion */
+  --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.light {
+  --color-bg: #f6fbf8;
+  --color-card: #cad9d0;
+  --color-text: #0f2a1f;
+  --color-border: #898d8b;
+  --color-accent: #059669;
+
+  --color-bg-focus: #d0dbd5;
+  --color-card-focus: #a2aca6;
+  --color-border-focus: #4e5450;
+  --color-accent-focus: #057d57;
+}

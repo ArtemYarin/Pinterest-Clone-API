@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getPins } from '../api/pins'
+import axios from 'axios'
 
 export default function usePins(query = '') {
     const [pins, setPins] = useState([])
@@ -14,9 +15,7 @@ export default function usePins(query = '') {
         getPins(query, {signal: controller.signal})
             .then(setPins)
             .catch((err) => {
-                if (err.name === 'AbortError' || err.name === 'CanceledError' || err.message === 'canceled') {
-                    return
-                }
+                if (axios.isCancel(err)) return;
                 setError(err.message)
             })
             .finally(() => {
