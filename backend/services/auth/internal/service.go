@@ -11,7 +11,9 @@ import (
 	"github.com/ArtemYarin/pinterest-clone-api/pkg/jwt"
 	"github.com/ArtemYarin/pinterest-clone-api/pkg/rabbitmq"
 	"github.com/ArtemYarin/pinterest-clone-api/services/auth-service/internal/password"
+	"github.com/ArtemYarin/pinterest-clone-api/services/auth-service/internal/refresh"
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 	rmq "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp"
 )
 
@@ -23,10 +25,15 @@ type EventPublisher interface {
 
 type UserService interface {
 	RegisterUser(ctx context.Context, user CredentialsUserRequest) (*UserWithTokenResponse, error)
-	LoginUser(ctx context.Context, user CredentialsUserRequest) (string, error)
+	LoginUser(ctx context.Context, user CredentialsUserRequest) (*UserWithTokenResponse, error)
 	GetUserByEmail(ctx context.Context, email string) (*UserResponse, error)
 	GetUserByID(ctx context.Context, id string) (*UserResponse, error)
 	UpdateUser(ctx context.Context, user UpdateUserRequest) error
+	SaveRefreshToken(ctx context.Context, user_id, token string) error
+	FindRefreshToken(ctx context.Context, token string) (*RefreshToken, error)
+	RevokeRefreshToken(ctx context.Context, id uuid.UUID) error
+	RevokeRefreshTokenByHash(ctx context.Context, token string) error
+	IssueAccessToken(userID uuid.UUID) (string, error)
 }
 
 type userService struct {
@@ -103,32 +110,42 @@ func (s *userService) RegisterUser(ctx context.Context, user CredentialsUserRequ
 	}, nil
 }
 
-func (s *userService) LoginUser(ctx context.Context, user CredentialsUserRequest) (string, error) {
+func (s *userService) LoginUser(ctx context.Context, user CredentialsUserRequest) (*UserWithTokenResponse, error) {
 	// Validate input
 	err := s.validate.Struct(user)
 	if err != nil {
 		valErr := newValidationErr(getValidationMap(err))
-		return "", fmt.Errorf("service LoginUser: %w", valErr)
+		return nil, fmt.Errorf("service LoginUser: %w", valErr)
 	}
 
 	// Repo
 	storedUser, err := s.repo.GetUserByEmail(ctx, user.Email)
 	if err != nil {
-		return "", fmt.Errorf("get user from repository: %w", err)
+		return nil, fmt.Errorf("get user from repository: %w", err)
 	}
 
 	// Password validation
 	if err := password.CheckPassword(storedUser.Password_hash, user.Password_hash); err != nil {
-		return "", fmt.Errorf("compare password: %w", errUnauthorized)
+		return nil, fmt.Errorf("compare password: %w", errUnauthorized)
 	}
 
 	// Token
 	token, err := jwt.GenerateToken(storedUser.Id)
 	if err != nil {
-		return "", fmt.Errorf("generate token: %w:", err)
+		return nil, fmt.Errorf("generate token: %w:", err)
 	}
 
-	return token, nil
+	userRes := UserResponse{
+		Id:         storedUser.Id,
+		Email:      storedUser.Email,
+		Created_at: storedUser.Created_at,
+		Updated_at: storedUser.Updated_at,
+	}
+
+	return &UserWithTokenResponse{
+		UserResponse: userRes,
+		Token:        token,
+	}, nil
 }
 
 func (s *userService) GetUserByEmail(ctx context.Context, email string) (*UserResponse, error) {
@@ -183,6 +200,45 @@ func (s *userService) UpdateUser(ctx context.Context, user UpdateUserRequest) er
 		return fmt.Errorf("update user in repository: %w", err)
 	}
 	return nil
+}
+
+func (s *userService) SaveRefreshToken(ctx context.Context, user_id, token string) error {
+	ttl := time.Now().Add(refresh.RefreshTTL)
+	if err := s.repo.SaveRefreshToken(ctx, user_id, token, ttl); err != nil {
+		return fmt.Errorf("create refresh token in repository: %w", err)
+	}
+	return nil
+}
+
+func (s *userService) FindRefreshToken(ctx context.Context, token string) (*RefreshToken, error) {
+	rt, err := s.repo.FindRefreshToken(ctx, refresh.HashToken(token))
+	if err != nil {
+		return nil, fmt.Errorf("find refresh token in repository: %w", err)
+	}
+	return rt, nil
+}
+
+func (s *userService) RevokeRefreshToken(ctx context.Context, id uuid.UUID) error {
+	if err := s.repo.RevokeRefreshToken(ctx, id); err != nil {
+		return fmt.Errorf("revoke refresh token in repository: %w", err)
+	}
+	return nil
+}
+
+// RevokeRefreshTokenByHash takes the plain token (cookie value) and revokes it by its hash.
+func (s *userService) RevokeRefreshTokenByHash(ctx context.Context, token string) error {
+	if err := s.repo.RevokeRefreshTokenByHash(ctx, refresh.HashToken(token)); err != nil {
+		return fmt.Errorf("revoke refresh token by hash in repository: %w", err)
+	}
+	return nil
+}
+
+func (s *userService) IssueAccessToken(userID uuid.UUID) (string, error) {
+	token, err := jwt.GenerateToken(userID)
+	if err != nil {
+		return "", fmt.Errorf("generate token: %w", err)
+	}
+	return token, nil
 }
 
 var usernameSanitizeRegex = regexp.MustCompile(`[^a-z0-9_]`)

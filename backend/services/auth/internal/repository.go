@@ -3,7 +3,9 @@ package auth
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -12,6 +14,10 @@ type UserRepository interface {
 	GetUserByEmail(ctx context.Context, email string) (*UserWithPasswordResponse, error)
 	GetUserByID(ctx context.Context, id string) (*UserResponse, error)
 	UpdateUser(ctx context.Context, user UpdateUserRequest) error
+	SaveRefreshToken(ctx context.Context, user_id, hash string, ttl time.Time) error
+	FindRefreshToken(ctx context.Context, hash string) (*RefreshToken, error)
+	RevokeRefreshToken(ctx context.Context, id uuid.UUID) error
+	RevokeRefreshTokenByHash(ctx context.Context, hash string) error
 }
 
 type userRepository struct {
@@ -93,4 +99,73 @@ func (r *userRepository) UpdateUser(ctx context.Context, user UpdateUserRequest)
 	}
 
 	return nil
+}
+
+func (r *userRepository) SaveRefreshToken(ctx context.Context, user_id, hash string, ttl time.Time) error {
+	_, err := r.db.Exec(ctx,
+		"INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)",
+		user_id, hash, ttl)
+
+	if err != nil {
+		return fmt.Errorf("SaveRefreshToken user_id %s: %v", user_id, err)
+	}
+
+	return nil
+}
+
+func (r *userRepository) FindRefreshToken(ctx context.Context, hash string) (*RefreshToken, error) {
+	var t RefreshToken
+	err := r.db.QueryRow(ctx, `
+		SELECT id, user_id, token_hash, expires_at, revoked_at, created_at 
+		FROM refresh_tokens
+		WHERE token_hash = $1`, hash,
+	).Scan(&t.ID, &t.UserID, &t.TokenHash, &t.ExpiresAt, &t.RevokedAt, &t.CreatedAt)
+
+	if err != nil {
+		if isNotFoundErr(err) {
+			return nil, fmt.Errorf("refresh token not found: %w", errTokenNotFound)
+		}
+		return nil, fmt.Errorf("FindRefreshToken: %v", err)
+	}
+
+	return &t, nil
+}
+
+// RevokeRefreshToken marks a token as revoked. Only an unrevoked token matches,
+// so of two concurrent refreshes with the same token only one succeeds.
+func (r *userRepository) RevokeRefreshToken(ctx context.Context, id uuid.UUID) error {
+	tag, err := r.db.Exec(ctx,
+		"UPDATE refresh_tokens SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL", id)
+	if err != nil {
+		return fmt.Errorf("RevokeRefreshToken id %s: %v", id, err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("refresh token %s not found or already revoked: %w", id, errTokenNotFound)
+	}
+	return nil
+}
+
+func (r *userRepository) RevokeRefreshTokenByHash(ctx context.Context, hash string) error {
+	tag, err := r.db.Exec(ctx,
+		"UPDATE refresh_tokens SET revoked_at = now() WHERE token_hash = $1 AND revoked_at IS NULL", hash)
+	if err != nil {
+		return fmt.Errorf("RevokeRefreshTokenByHash: %v", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("refresh token not found or already revoked: %w", errTokenNotFound)
+	}
+	return nil
+}
+
+type RefreshToken struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	TokenHash string
+	ExpiresAt time.Time
+	RevokedAt *time.Time // nil = still valid
+	CreatedAt time.Time
+}
+
+func (t *RefreshToken) IsValid(now time.Time) bool {
+	return t.RevokedAt == nil && now.Before(t.ExpiresAt)
 }

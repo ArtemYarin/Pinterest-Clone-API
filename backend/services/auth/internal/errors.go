@@ -14,6 +14,7 @@ var errEmailExists = errors.New("conflict error")
 var errBadRequest = errors.New("bad request error")
 var errUnauthorized = errors.New("unauthorized error")
 var errUserNotFound = errors.New("user not found error")
+var errTokenNotFound = errors.New("refresh token not found error")
 var errInternalServer = errors.New("internal server error")
 
 // Validation error

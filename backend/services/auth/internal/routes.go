@@ -13,6 +13,8 @@ func UserRouter(handler *UserHandler, userPool *pgxpool.Pool) chi.Router {
 
 	r.Post("/signup", handler.RegisterUser)
 	r.Post("/login", handler.LoginUser)
+	r.Post("/refresh", handler.Refresh)
+	r.Post("/logout", handler.Logout)
 	r.Get("/{id}", handler.GetUserByID)
 	r.Get("/email/{email}", handler.GetUserByEmail)
 

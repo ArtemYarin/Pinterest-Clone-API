@@ -75,6 +75,13 @@ func WriteJSONError(err error, w http.ResponseWriter) {
 			"message": "user not found",
 		})
 		return
+	case errors.Is(err, errTokenNotFound):
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{
+			"code":    "404",
+			"message": "refresh token not found",
+		})
+		return
 	case errors.Is(err, errInternalServer):
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{
