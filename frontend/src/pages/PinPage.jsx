@@ -1,27 +1,17 @@
 import { useState } from 'react'
 import PinGrid from '../features/PinGrid'
 import usePins from '../hooks/usePins'
+import useDebouncedValue from '../hooks/useDebouncedValue'
 import Header from '../features/Header'
-import { useAuth } from '../context/authContext'
 
-export default function PinPage({}) {
+export default function PinPage() {
   const [query, setQuery] = useState('')
-  const [avaUrl, setAvaUrl] = useState()
-  const { pins, loading, error } = usePins(query)
-  const { setAccessToken } = useAuth()
-
-  function onAuthSuccess(data) {
-    setAccessToken(data.token)
-  }
+  const debouncedQuery = useDebouncedValue(query.trim(), 300)
+  const { pins, loading, error } = usePins(debouncedQuery)
 
   return (
-    <div className='flex flex-col gap-4 min-h-dvh p-6'>
-      <Header
-        onAuthSuccess={onAuthSuccess}
-        value={query}
-        onChange={setQuery}
-        avaUrl={avaUrl}
-      />
+    <div className='flex min-h-dvh flex-col gap-4 px-6 pb-6'>
+      <Header value={query} onChange={setQuery} />
       <PinGrid pins={pins} loading={loading} error={error} />
     </div>
   )

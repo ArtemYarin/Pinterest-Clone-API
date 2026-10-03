@@ -4,6 +4,7 @@ export default function PinCard({ pin }) {
       <img
         src={pin.download_url}
         alt={pin.pin.title}
+        loading='lazy'
         className='w-full rounded-xl block'
       />
     </div>

@@ -1,10 +1,9 @@
 import axios from "axios";
 
-const host = import.meta.env.VITE_API_HOST;
-const port = import.meta.env.VITE_API_PORT;
-
+// Requests go to the same origin; in dev Vite proxies them to the API (see vite.config.js).
 const client = axios.create({
-    baseURL: `http://${host}:${port}/`,
+    baseURL: "/",
+    withCredentials: true,
     headers: {
         "Content-Type": "application/json",
     },
