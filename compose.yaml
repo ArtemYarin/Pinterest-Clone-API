@@ -262,6 +262,7 @@ services:
       POSTGRES_DB: ${INTERACTION_POSTGRES_DB}
       REDIS_ADDR: ${REDIS_ADDR}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
     ports:
       - "8083:8080"
 

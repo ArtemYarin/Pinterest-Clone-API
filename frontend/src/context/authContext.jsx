@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import { getAccessToken, setAccessToken } from '../localStorage/tokenStore'
 import client from '../api/client'
 import { refresh } from '../api/refresh'
 import { logout as logoutRequest } from '../api/logout'
@@ -30,31 +31,28 @@ function refreshOnce() {
 // cookie. Restores the session on load and attaches/renews the token for
 // every request made through the api client.
 export function AuthProvider({ children }) {
-  const tokenRef = useRef(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isInitializing, setIsInitializing] = useState(true)
 
-  const setAccessToken = useCallback((token) => {
-    tokenRef.current = token
+  const setAccessTokenC = useCallback((token) => {
+    setAccessToken(token)
     setIsAuthenticated(!!token)
   }, [])
 
-  const getAccessToken = useCallback(() => tokenRef.current, [])
-
   // Accepts the { token } payload returned by login, signup and refresh.
   const signIn = useCallback(
-    (data) => setAccessToken(data.token),
-    [setAccessToken],
+    (data) => setAccessTokenC(data.token),
+    [setAccessTokenC],
   )
 
   const logout = useCallback(async () => {
-    setAccessToken(null)
+    setAccessTokenC(null)
     try {
       await logoutRequest()
     } catch {
       // The local session is already gone; a failed revoke is not actionable here.
     }
-  }, [setAccessToken])
+  }, [setAccessTokenC])
 
   // Restore the session from the refresh cookie on reload.
   useEffect(() => {
@@ -66,7 +64,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const requestId = client.interceptors.request.use((config) => {
-      const token = tokenRef.current
+      const token = getAccessToken()
       if (token) config.headers.Authorization = `Bearer ${token}`
       return config
     })
@@ -90,7 +88,7 @@ export function AuthProvider({ children }) {
           const data = await refreshOnce()
           signIn(data)
         } catch {
-          setAccessToken(null)
+          setAccessTokenC(null)
           throw error
         }
         return client(original)
@@ -101,11 +99,11 @@ export function AuthProvider({ children }) {
       client.interceptors.request.eject(requestId)
       client.interceptors.response.eject(responseId)
     }
-  }, [signIn, setAccessToken])
+  }, [signIn, setAccessTokenC])
 
   const value = useMemo(
-    () => ({ isAuthenticated, isInitializing, getAccessToken, signIn, logout }),
-    [isAuthenticated, isInitializing, getAccessToken, signIn, logout],
+    () => ({ isAuthenticated, isInitializing, signIn, logout }),
+    [isAuthenticated, isInitializing, signIn, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

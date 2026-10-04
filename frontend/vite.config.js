@@ -15,6 +15,7 @@ export default defineConfig(({ mode }) => {
       proxy: {
         '/auth': target,
         '/pin': target,
+        '/interaction': target,
       },
     },
   }
