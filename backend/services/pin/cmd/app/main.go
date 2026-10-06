@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,10 +12,13 @@ import (
 	"syscall"
 	"time"
 
+	pinv1 "github.com/ArtemYarin/pinterest-clone-api/gen/pin/v1"
 	"github.com/ArtemYarin/pinterest-clone-api/pkg/postgres"
 	pin "github.com/ArtemYarin/pinterest-clone-api/services/pin-service/internal"
+	pingrpc "github.com/ArtemYarin/pinterest-clone-api/services/pin-service/internal/grpc"
 	"github.com/go-playground/validator/v10"
 	"github.com/joho/godotenv"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -104,9 +108,25 @@ func main() {
 		}
 	}()
 
+	// gRPC server (internal calls from gateway)
+	lis, err := net.Listen("tcp", ":"+os.Getenv("PIN_GRPC_PORT"))
+	if err != nil {
+		log.Fatalf("Failed to listen for gRPC: %v", err)
+	}
+	grpcServer := grpc.NewServer()
+	pinv1.RegisterPinServiceServer(grpcServer, pingrpc.NewServer(pinService))
+	go func() {
+		if err := grpcServer.Serve(lis); err != nil {
+			log.Fatal(err)
+		}
+	}()
+	log.Println("Started gRPC server successfully")
+
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
+
+	grpcServer.GracefulStop()
 
 	ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

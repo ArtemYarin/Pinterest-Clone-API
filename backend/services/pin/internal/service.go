@@ -23,6 +23,7 @@ type PinService interface {
 	CreatePin(ctx context.Context, userID uuid.UUID, pin CreatePinRequest) (*UploadImgPinResponse, error)
 	GetPinByID(ctx context.Context, id string) (*DownloadImgPinResponse, error)
 	GetPins(ctx context.Context, filters PinFilters) ([]DownloadImgPinResponse, int, error)
+	GetPinsByIDs(ctx context.Context, ids uuid.UUIDs) ([]DownloadImgPinResponse, error)
 	UpdatePin(ctx context.Context, id string, userID uuid.UUID, pin UpdatePinRequest) error
 	DeletePin(ctx context.Context, id string, userID uuid.UUID) error
 	ConfirmUpload(ctx context.Context, id string, userID uuid.UUID) (*PinResponse, error)
@@ -111,6 +112,27 @@ func (s *pinService) GetPins(ctx context.Context, filters PinFilters) ([]Downloa
 	}
 
 	return resp, count, nil
+}
+
+func (s *pinService) GetPinsByIDs(ctx context.Context, ids uuid.UUIDs) ([]DownloadImgPinResponse, error) {
+	pins, err := s.repo.GetPinsByIDs(ctx, ids)
+	if err != nil {
+		return nil, fmt.Errorf("get pins by ids from repository: %w", err)
+	}
+
+	resp := make([]DownloadImgPinResponse, 0, len(pins))
+	for _, pin := range pins {
+		downloadURL, err := s.imgStorage.GenerateDownloadURL(ctx, pin.Image_url, 1*time.Hour)
+		if err != nil {
+			return nil, fmt.Errorf("generate download url for pin: %s: %w", pin.Id, err)
+		}
+		resp = append(resp, DownloadImgPinResponse{
+			Pin:          pin,
+			Download_url: downloadURL,
+		})
+	}
+
+	return resp, nil
 }
 
 func (s *pinService) UpdatePin(ctx context.Context, id string, userID uuid.UUID, pin UpdatePinRequest) error {

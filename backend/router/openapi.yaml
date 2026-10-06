@@ -16,6 +16,8 @@ tags:
     description: Pin creation, retrieval, and management
   - name: Interaction
     description: Likes on pins
+  - name: Users
+    description: Composed endpoints served by the gateway itself (gRPC fan-out to services)
   - name: Health
     description: Service health checks
 
@@ -547,6 +549,47 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /users/{userID}/liked-pins:
+    get:
+      tags: [Users]
+      summary: List pins liked by a user
+      description: >
+        Composed by the gateway: fetches the user's liked pin IDs from the
+        interaction service, then the pin data from the pin service (both over
+        gRPC). Pins are ordered by like time, newest first. Deleted or
+        unconfirmed pins are omitted.
+      operationId: getLikedPins
+      parameters:
+        - name: userID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Liked pins
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LikedPinsResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          description: An upstream service is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "504":
+          description: An upstream service timed out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -767,6 +810,22 @@ components:
           format: uuid
         liked:
           type: boolean
+
+    LikedPinsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/DownloadImgPinResponse"
+        metadata:
+          type: object
+          properties:
+            total:
+              type: integer
+            user_id:
+              type: string
+              format: uuid
 
     ListLikedResponse:
       type: object

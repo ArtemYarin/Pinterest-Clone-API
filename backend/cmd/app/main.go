@@ -3,15 +3,21 @@ package main
 import (
 	"context"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	likesv1 "github.com/ArtemYarin/pinterest-clone-api/gen/likes/v1"
+	pinv1 "github.com/ArtemYarin/pinterest-clone-api/gen/pin/v1"
+	"github.com/ArtemYarin/pinterest-clone-api/handlers/users"
 	"github.com/ArtemYarin/pinterest-clone-api/pkg/middleware"
 	"github.com/ArtemYarin/pinterest-clone-api/router"
 	"github.com/joho/godotenv"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
@@ -27,8 +33,29 @@ func main() {
 		Capacity: 10,
 	}
 
+	// gRPC clients (connections are established lazily on first call)
+	interactionConn, err := grpc.NewClient(
+		net.JoinHostPort(os.Getenv("INTERACTION_HOST"), os.Getenv("INTERACTION_GRPC_PORT")),
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("Failed to create interaction gRPC client: %v", err)
+	}
+	defer interactionConn.Close()
+
+	pinConn, err := grpc.NewClient(
+		net.JoinHostPort(os.Getenv("PIN_HOST"), os.Getenv("PIN_GRPC_PORT")),
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("Failed to create pin gRPC client: %v", err)
+	}
+	defer pinConn.Close()
+
 	// Wiring
-	r := router.SetupRouter(&rateLimiter)
+	likedPinsHandler := users.NewLikedPinsHandler(
+		likesv1.NewLikesServiceClient(interactionConn),
+		pinv1.NewPinServiceClient(pinConn))
+
+	r := router.SetupRouter(&rateLimiter, likedPinsHandler)
 
 	// Server setup
 	port := os.Getenv("GATEWAY_PORT")

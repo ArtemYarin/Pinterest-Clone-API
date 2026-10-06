@@ -3,17 +3,21 @@ package main
 import (
 	"context"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	likesv1 "github.com/ArtemYarin/pinterest-clone-api/gen/likes/v1"
 	"github.com/ArtemYarin/pinterest-clone-api/pkg/postgres"
 	"github.com/ArtemYarin/pinterest-clone-api/services/interaction-service/internal/likes"
+	likesgrpc "github.com/ArtemYarin/pinterest-clone-api/services/interaction-service/internal/likes/grpc"
 	"github.com/ArtemYarin/pinterest-clone-api/services/interaction-service/internal/shared/db"
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -75,9 +79,25 @@ func main() {
 		}
 	}()
 
+	// gRPC server (internal calls from gateway)
+	lis, err := net.Listen("tcp", ":"+os.Getenv("INTERACTION_GRPC_PORT"))
+	if err != nil {
+		log.Fatalf("Failed to listen for gRPC: %v", err)
+	}
+	grpcServer := grpc.NewServer()
+	likesv1.RegisterLikesServiceServer(grpcServer, likesgrpc.NewServer(likeService))
+	go func() {
+		if err := grpcServer.Serve(lis); err != nil {
+			log.Fatal(err)
+		}
+	}()
+	log.Println("Started gRPC server successfully")
+
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
+
+	grpcServer.GracefulStop()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

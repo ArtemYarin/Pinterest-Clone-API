@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package likes.v1;
+
+option go_package = "github.com/ArtemYarin/pinterest-clone-api/gen/likes/v1;likesv1";
+
+service LikesService {
+  // ListLikedPinIDs returns IDs of all pins liked by the user, newest like first.
+  rpc ListLikedPinIDs(ListLikedPinIDsRequest) returns (ListLikedPinIDsResponse);
+}
+
+message ListLikedPinIDsRequest {
+  string user_id = 1;
+}
+
+message ListLikedPinIDsResponse {
+  repeated string pin_ids = 1;
+}

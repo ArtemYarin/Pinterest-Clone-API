@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package pin.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/ArtemYarin/pinterest-clone-api/gen/pin/v1;pinv1";
+
+service PinService {
+  // GetPinsByIDs returns confirmed pins with given IDs. Missing pins are omitted, order is not guaranteed.
+  rpc GetPinsByIDs(GetPinsByIDsRequest) returns (GetPinsByIDsResponse);
+}
+
+message GetPinsByIDsRequest {
+  repeated string ids = 1;
+}
+
+message GetPinsByIDsResponse {
+  repeated Pin pins = 1;
+}
+
+message Pin {
+  string id = 1;
+  string user_id = 2;
+  string title = 3;
+  string image_url = 4;
+  string image_status = 5;
+  optional string description = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+  int64 likes = 9;
+  string download_url = 10;
+}

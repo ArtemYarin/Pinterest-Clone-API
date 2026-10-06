@@ -125,7 +125,7 @@ func (r *likeRepository) HasLikedBatch(ctx context.Context, userID uuid.UUID, pi
 // ListLikedByUser returns a slice with all pinIDs that user liked
 func (r *likeRepository) ListLikedByUser(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error) {
 	rows, err := r.db.Query(ctx,
-		"SELECT pin_id FROM pin_likes WHERE user_id = $1",
+		"SELECT pin_id FROM pin_likes WHERE user_id = $1 ORDER BY created_at DESC",
 		userID)
 
 	if err != nil {

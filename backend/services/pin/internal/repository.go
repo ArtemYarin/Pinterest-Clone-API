@@ -13,6 +13,7 @@ type PinRepository interface {
 	CreatePin(ctx context.Context, userID uuid.UUID, imageURL string, pin CreatePinRequest) (*PinResponse, error)
 	GetPinByID(ctx context.Context, id string) (*PinResponse, error)
 	GetPins(ctx context.Context, filters PinFilters) ([]PinResponse, int, error)
+	GetPinsByIDs(ctx context.Context, ids uuid.UUIDs) ([]PinResponse, error)
 	UpdatePin(ctx context.Context, pin UpdatePinRequest) error
 	DeletePin(ctx context.Context, id string) error
 	UpdateImageStatus(ctx context.Context, id string, status string) error
@@ -135,6 +136,35 @@ func (r *pinRepository) GetPins(ctx context.Context, filters PinFilters) ([]PinR
 	}
 
 	return pins, count, nil
+}
+
+// GetPinsByIDs returns confirmed pins with given IDs. Missing pins are omitted, order is not guaranteed
+func (r *pinRepository) GetPinsByIDs(ctx context.Context, ids uuid.UUIDs) ([]PinResponse, error) {
+	if len(ids) == 0 {
+		return []PinResponse{}, nil
+	}
+
+	rows, err := r.db.Query(ctx,
+		`SELECT id, user_id, title, image_url, image_status, description, created_at, updated_at, likes
+		 FROM pins WHERE id = ANY($1) AND image_status = 'confirmed'`, ids)
+	if err != nil {
+		return nil, fmt.Errorf("GetPinsByIDs (%d ids): %v: %w", len(ids), err, errInternalServer)
+	}
+	defer rows.Close()
+
+	pins := make([]PinResponse, 0, len(ids))
+	for rows.Next() {
+		var p PinResponse
+		if err := rows.Scan(&p.Id, &p.User_id, &p.Title, &p.Image_url, &p.Image_status, &p.Description, &p.Created_at, &p.Updated_at, &p.Likes); err != nil {
+			return nil, fmt.Errorf("unable to scan pin: %v: %w", err, errInternalServer)
+		}
+		pins = append(pins, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("scan rows: %v: %w", err, errInternalServer)
+	}
+
+	return pins, nil
 }
 
 func (r *pinRepository) UpdatePin(ctx context.Context, pin UpdatePinRequest) error {

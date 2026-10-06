@@ -8,6 +8,7 @@ COPY go.mod go.sum ./
 
 RUN cd services/pin/ && go mod download
 
+COPY gen ./gen
 COPY pkg ./pkg
 
 WORKDIR /app/services/pin

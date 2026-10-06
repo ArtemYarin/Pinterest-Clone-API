@@ -9,12 +9,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ArtemYarin/pinterest-clone-api/handlers/users"
 	"github.com/ArtemYarin/pinterest-clone-api/pkg/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 )
 
-func SetupRouter(rateLimiter *middleware.IPRateLimiter) chi.Router {
+func SetupRouter(rateLimiter *middleware.IPRateLimiter, likedPins *users.LikedPinsHandler) chi.Router {
 	r := chi.NewRouter()
 
 	r.Use(cors.Handler(cors.Options{
@@ -31,6 +32,9 @@ func SetupRouter(rateLimiter *middleware.IPRateLimiter) chi.Router {
 
 	r.Get("/openapi.yaml", serveOpenAPISpec)
 	r.Get("/docs", serveSwaggerUI)
+
+	// Composed endpoints (gRPC fan-out to internal services)
+	r.Get("/users/{userID}/liked-pins", likedPins.GetLikedPins)
 
 	authProxy := setupAuthProxy()
 	pinProxy := setupPinProxy()
