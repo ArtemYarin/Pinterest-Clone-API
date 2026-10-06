@@ -2,6 +2,7 @@ package likes
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -49,34 +50,58 @@ func (w *Worker) Stop() {
 }
 
 func (w *Worker) SyncToPostgres(ctx context.Context) {
+	// Get all pins whos like count(delta) was changed
 	pinIDs, err := w.redis.SMembers(ctx, "likes:dirty").Result()
 	if err != nil {
 		log.Println("can't get pin IDs from redis: ", err)
+		return
 	}
 
+	// Loop for each pin
 	for _, pinID := range pinIDs {
 		key := fmt.Sprintf("likes:count:%s", pinID)
 
-		delta, err := w.redis.GetDel(ctx, key).Int64()
+		// Clear the dirty mark before taking the delta.
+		if err := w.redis.SRem(ctx, "likes:dirty", pinID).Err(); err != nil {
+			log.Printf("can't clear dirty mark for pin %s: %v", pinID, err)
+			continue
+		}
 
-		if err != nil && err != redis.Nil {
-			continue // leave in dirty set, retry next cycle
+		// Get and delete delta
+		delta, err := w.redis.GetDel(ctx, key).Int64()
+		if err != nil && !errors.Is(err, redis.Nil) {
+			log.Printf("can't take like delta for pin %s: %v", pinID, err)
+			w.restoreDelta(ctx, pinID, key, 0)
+			continue
 		}
 		if delta == 0 {
-			w.redis.SRem(ctx, "likes:dirty", pinID)
 			continue
 		}
 
+		// Insert delta into db.
 		_, err = w.db.Exec(ctx,
-			"UPDATE like_counts SET count = count + $1 WHERE target_id = $2",
+			`INSERT INTO like_counts (target_id, count, updated_at)
+			 VALUES ($2, $1, now())
+			 ON CONFLICT (target_id)
+			 DO UPDATE SET count = like_counts.count + EXCLUDED.count, updated_at = now()`,
 			delta, pinID)
 		if err != nil {
-			// Postgres write failed — give the delta back to Redis
-			// so it isn't lost, and leave pinID dirty for retry.
-			w.redis.IncrBy(ctx, key, delta)
-			continue
+			log.Printf("can't sync like delta %d for pin %s: %v", delta, pinID, err)
+			w.restoreDelta(ctx, pinID, key, delta)
 		}
+	}
+}
 
-		w.redis.SRem(ctx, "likes:dirty", pinID)
+// restoreDelta gives a delta back to Redis and re-marks the pin dirty so it is retried next cycle.
+func (w *Worker) restoreDelta(ctx context.Context, pinID, key string, delta int64) {
+	_, err := w.redis.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+		if delta != 0 {
+			pipe.IncrBy(ctx, key, delta)
+		}
+		pipe.SAdd(ctx, "likes:dirty", pinID)
+		return nil
+	})
+	if err != nil {
+		log.Printf("can't restore like delta %d for pin %s: %v", delta, pinID, err)
 	}
 }

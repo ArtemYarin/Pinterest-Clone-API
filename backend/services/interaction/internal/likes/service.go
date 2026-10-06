@@ -35,14 +35,23 @@ func (s *likeService) AddLike(ctx context.Context, userID, pinID uuid.UUID) erro
 		return fmt.Errorf("add like in repository: %w", err)
 	}
 	if inserted {
-		if err := s.redis.SAdd(ctx, "likes:dirty", pinID.String()).Err(); err != nil {
-			return fmt.Errorf("mark pin dirty in redis: %w", err)
-		}
-		if err := s.redis.Incr(ctx, fmt.Sprintf("likes:count:%s", pinID.String())).Err(); err != nil {
+		if err := s.applyDelta(ctx, pinID, 1); err != nil {
 			return fmt.Errorf("incr like count in redis: %w", err)
 		}
 	}
 	return nil
+}
+
+// applyDelta changes the pending like count delta in Redis and marks the pin dirty.
+// The delta is applied before the dirty mark so the worker never clears a mark
+// for a delta it hasn't seen yet.
+func (s *likeService) applyDelta(ctx context.Context, pinID uuid.UUID, delta int64) error {
+	_, err := s.redis.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+		pipe.IncrBy(ctx, fmt.Sprintf("likes:count:%s", pinID.String()), delta)
+		pipe.SAdd(ctx, "likes:dirty", pinID.String())
+		return nil
+	})
+	return err
 }
 
 func (s *likeService) RemoveLike(ctx context.Context, userID, pinID uuid.UUID) error {
@@ -51,8 +60,9 @@ func (s *likeService) RemoveLike(ctx context.Context, userID, pinID uuid.UUID) e
 		return fmt.Errorf("remove like in repository: %w", err)
 	}
 	if deleted {
-		s.redis.SAdd(ctx, "likes:dirty", pinID.String())
-		s.redis.Decr(ctx, fmt.Sprintf("likes:count:%s", pinID.String()))
+		if err := s.applyDelta(ctx, pinID, -1); err != nil {
+			return fmt.Errorf("decr like count in redis: %w", err)
+		}
 	}
 	return nil
 }
