@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/cors"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
@@ -52,6 +53,19 @@ func NewImageStorage(ctx context.Context, internalEndpoint, publicEndpoint, acce
 	}
 
 	return &ImageStorage{client: client, presignClient: presignClient, bucket: bucket}, nil
+}
+
+// AllowBrowserAccess sets the bucket CORS rules so browsers on the given
+// origins can PUT images to presigned upload URLs directly.
+func (s *ImageStorage) AllowBrowserAccess(ctx context.Context, origins []string) error {
+	cfg := cors.NewConfig([]cors.Rule{{
+		AllowedOrigin: origins,
+		AllowedMethod: []string{"GET", "PUT", "HEAD"},
+		AllowedHeader: []string{"*"},
+		ExposeHeader:  []string{"ETag"},
+		MaxAgeSeconds: 3600,
+	}})
+	return s.client.SetBucketCors(ctx, s.bucket, cfg)
 }
 
 func (s *ImageStorage) GenerateUploadURL(ctx context.Context, objectKey string, expiry time.Duration) (string, error) {

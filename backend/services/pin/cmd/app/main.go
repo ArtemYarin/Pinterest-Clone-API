@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -57,6 +58,15 @@ func main() {
 		log.Fatalf("Failed to connect to Garage: %v", err)
 	}
 	log.Println("Connected to Garage successfully")
+
+	// Browsers upload images straight to Garage, which needs bucket CORS rules.
+	corsOrigins := []string{"*"}
+	if v := os.Getenv("GARAGE_CORS_ORIGINS"); v != "" {
+		corsOrigins = strings.Split(v, ",")
+	}
+	if err := miniO.AllowBrowserAccess(ctx, corsOrigins); err != nil {
+		log.Fatalf("Failed to set Garage bucket CORS: %v", err)
+	}
 
 	// Wiring
 	pinRepo := pin.NewPinRepository(pool)
