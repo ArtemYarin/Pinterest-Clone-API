@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router'
 import { AuthProvider } from './context/authContext'
 import PinsPage from './pages/PinsPage'
 import PinPage from './pages/PinPage'
+import ProfilePage from './pages/ProfilePage'
 
 function App() {
   return (
@@ -9,6 +10,7 @@ function App() {
       <AuthProvider>
         <Routes>
           <Route path='/' element={<PinsPage />} />
+          <Route path='/users/:userId' element={<ProfilePage />} />
           <Route path='/:pinId' element={<PinPage />} />
         </Routes>
       </AuthProvider>

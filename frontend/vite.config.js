@@ -16,6 +16,9 @@ export default defineConfig(({ mode }) => {
         '/auth': target,
         '/pin': target,
         '/interaction': target,
+        '/profile': target,
+        // Only the API path; /users/:userId itself is a frontend route (ProfilePage).
+        '^/users/[^/]+/liked-pins': target,
       },
     },
   }

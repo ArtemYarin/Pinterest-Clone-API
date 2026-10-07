@@ -5,6 +5,7 @@ import { useAuth } from '../context/authContext'
 import LoginModal from '../components/auth/LoginModal'
 import SignUpModal from '../components/auth/SignUpModal'
 import UploadPinModal from '../components/UploadPinModal'
+import { Link } from 'react-router'
 
 function PlusIcon() {
   return (
@@ -21,7 +22,7 @@ function PlusIcon() {
 }
 
 export default function Header({ value, onChange }) {
-  const { isAuthenticated, isInitializing, logout } = useAuth()
+  const { isAuthenticated, isInitializing, userId, logout } = useAuth()
   // 'login' | 'signup' | 'upload' | null
   const [openModal, setOpenModal] = useState(null)
   const closeModal = () => setOpenModal(null)
@@ -31,6 +32,7 @@ export default function Header({ value, onChange }) {
       <SearchBar value={value} onChange={onChange} />
 
       {/* Render nothing while the session is restored to avoid flashing the auth buttons. */}
+      {/* Buttons depend on user's authentication. */}
       {isInitializing ? null : isAuthenticated ? (
         <div className='flex items-center gap-4 shrink-0'>
           <button
@@ -49,7 +51,9 @@ export default function Header({ value, onChange }) {
           >
             Log out
           </button>
-          <Avatar />
+          <Link to={`/users/${userId}`} aria-label='Your profile'>
+            <Avatar />
+          </Link>
         </div>
       ) : (
         <div className='flex gap-4'>

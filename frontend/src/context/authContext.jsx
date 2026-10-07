@@ -27,16 +27,30 @@ function refreshOnce() {
   return refreshPromise
 }
 
+// Reads the user_id claim from the jwt payload. Only used for building links;
+// the backend still verifies the token on every request.
+function userIdFromToken(token) {
+  if (!token) return null
+  try {
+    const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    return JSON.parse(atob(payload)).user_id ?? null
+  } catch {
+    return null
+  }
+}
+
 // Keeps the jwt access token in memory and the refresh token in an httpOnly
 // cookie. Restores the session on load and attaches/renews the token for
 // every request made through the api client.
 export function AuthProvider({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isInitializing, setIsInitializing] = useState(true)
+  const [userId, setUserId] = useState(null)
 
   const setAccessTokenC = useCallback((token) => {
     setAccessToken(token)
     setIsAuthenticated(!!token)
+    setUserId(userIdFromToken(token))
   }, [])
 
   // Accepts the { token } payload returned by login, signup and refresh.
@@ -102,8 +116,8 @@ export function AuthProvider({ children }) {
   }, [signIn, setAccessTokenC])
 
   const value = useMemo(
-    () => ({ isAuthenticated, isInitializing, signIn, logout }),
-    [isAuthenticated, isInitializing, signIn, logout],
+    () => ({ isAuthenticated, isInitializing, userId, signIn, logout }),
+    [isAuthenticated, isInitializing, userId, signIn, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

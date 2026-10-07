@@ -10,6 +10,7 @@ require (
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/joho/godotenv v1.5.1
 	github.com/nbutton23/zxcvbn-go v0.0.0-20210217022336-fa2cb2858354
+	github.com/rabbitmq/rabbitmq-amqp-go-client v1.4.0
 	golang.org/x/crypto v0.54.0
 )
 
@@ -25,8 +26,6 @@ require (
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
-	github.com/rabbitmq/amqp091-go v1.15.0 // indirect
-	github.com/rabbitmq/rabbitmq-amqp-go-client v1.4.0 // indirect
 	go.opentelemetry.io/otel v1.44.0 // indirect
 	go.opentelemetry.io/otel/metric v1.44.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect

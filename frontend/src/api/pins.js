@@ -6,6 +6,12 @@ export async function getPins(query, {signal} = {}) {
     return response.data.data ?? [];
 }
 
+// Returns pins created by the user. Same shape as getPins.
+export async function getUserPins(userId, {signal} = {}) {
+    const response = await client.get('/pin', {params: {user_id: userId}, signal});
+    return response.data.data ?? [];
+}
+
 // Creates the pin metadata. Returns an object: pin, upload_url (presigned PUT, 15 min).
 export async function createPin(body) {
     const response = await client.post('/pin', body);
