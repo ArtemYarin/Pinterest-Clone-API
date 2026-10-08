@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
+	"io/fs"
 	"log"
 	"net"
 	"net/http"
@@ -23,7 +25,11 @@ import (
 func main() {
 	// Load .env file
 	if err := godotenv.Load(".env.dev"); err != nil {
-		log.Println("file .env.dev not found, using system env vars")
+		if errors.Is(err, fs.ErrNotExist) {
+			log.Println("file .env.dev not found, using system env vars")
+		} else {
+			log.Fatalf("failed to parse .env.dev: %v", err)
+		}
 	}
 
 	// Rate Limiter

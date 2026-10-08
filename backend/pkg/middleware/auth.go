@@ -19,7 +19,13 @@ func GetUserClaims(r *http.Request) (*jwt.Claims, bool) {
 	return userClaims, ok
 }
 
-func AuthMiddleware(next http.Handler) http.Handler {
+func AuthMiddleware(jm *jwt.Manager) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return authHandler(jm, next)
+	}
+}
+
+func authHandler(jm *jwt.Manager, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Extraction
 		authHeader := r.Header.Get("Authorization")
@@ -35,7 +41,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		raw := strings.TrimPrefix(authHeader, "Bearer ")
 
 		// Validation
-		claims, err := jwt.ValidateToken(raw)
+		claims, err := jm.ValidateToken(raw)
 		if err != nil {
 			log.Printf("auth error: invalid or expired token")
 			w.Header().Set("Content-Type", "application/json")

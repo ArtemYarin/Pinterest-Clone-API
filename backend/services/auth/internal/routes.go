@@ -1,12 +1,13 @@
 package auth
 
 import (
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/jwt"
 	"github.com/ArtemYarin/pinterest-clone-api/pkg/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func UserRouter(handler *UserHandler, userPool *pgxpool.Pool) chi.Router {
+func UserRouter(handler *UserHandler, userPool *pgxpool.Pool, jm *jwt.Manager) chi.Router {
 	r := chi.NewRouter()
 
 	r.Get("/health", Health(userPool))
@@ -19,7 +20,7 @@ func UserRouter(handler *UserHandler, userPool *pgxpool.Pool) chi.Router {
 	r.Get("/email/{email}", handler.GetUserByEmail)
 
 	r.Group(func(r chi.Router) {
-		r.Use(middleware.AuthMiddleware)
+		r.Use(middleware.AuthMiddleware(jm))
 
 		r.Patch("/{id}", handler.UpdateUser)
 	})

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	pinv1 "github.com/ArtemYarin/pinterest-clone-api/gen/pin/v1"
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/jwt"
 	"github.com/ArtemYarin/pinterest-clone-api/pkg/postgres"
 	pin "github.com/ArtemYarin/pinterest-clone-api/services/pin-service/internal"
 	pingrpc "github.com/ArtemYarin/pinterest-clone-api/services/pin-service/internal/grpc"
@@ -25,6 +26,12 @@ func main() {
 	// Load .env file
 	if err := godotenv.Load(".env.dev"); err != nil {
 		log.Println("file .env.dev not found, using system env vars")
+	}
+
+	// JWT
+	jm, err := jwt.NewManager(os.Getenv("JWT_SECRET"), time.Hour)
+	if err != nil {
+		log.Fatalf("Failed to init JWT: %v", err)
 	}
 
 	// Connecting to db
@@ -89,7 +96,7 @@ func main() {
 	pinService := pin.NewPinService(pinRepo, validate, miniO)
 	pinHandler := pin.NewPinHandler(pinService)
 
-	r := pin.PinRouter(&pinHandler, pool, miniO)
+	r := pin.PinRouter(&pinHandler, pool, miniO, jm)
 
 	// Server setup
 	srv := http.Server{

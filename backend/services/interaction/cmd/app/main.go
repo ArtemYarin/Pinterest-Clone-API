@@ -11,6 +11,7 @@ import (
 	"time"
 
 	likesv1 "github.com/ArtemYarin/pinterest-clone-api/gen/likes/v1"
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/jwt"
 	"github.com/ArtemYarin/pinterest-clone-api/pkg/postgres"
 	"github.com/ArtemYarin/pinterest-clone-api/services/interaction-service/internal/likes"
 	likesgrpc "github.com/ArtemYarin/pinterest-clone-api/services/interaction-service/internal/likes/grpc"
@@ -24,6 +25,12 @@ func main() {
 	// Load .env file
 	if err := godotenv.Load(".env.dev"); err != nil {
 		log.Println("file .env.dev not found, using system env vars")
+	}
+
+	// JWT
+	jm, err := jwt.NewManager(os.Getenv("JWT_SECRET"), time.Hour)
+	if err != nil {
+		log.Fatalf("Failed to init JWT: %v", err)
 	}
 
 	// Postgres
@@ -60,7 +67,7 @@ func main() {
 	likeService := likes.NewLikeService(likeRepo, redisClient)
 	likeHandler := likes.NewLikeHandler(likeService)
 
-	r := likes.LikeRouter(&likeHandler, pool)
+	r := likes.LikeRouter(&likeHandler, pool, jm)
 
 	// Server setup
 	srv := http.Server{

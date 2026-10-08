@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/jwt"
 	"github.com/ArtemYarin/pinterest-clone-api/pkg/postgres"
 	"github.com/ArtemYarin/pinterest-clone-api/pkg/rabbitmq"
 	profile "github.com/ArtemYarin/pinterest-clone-api/services/profile-service/internal"
@@ -26,6 +27,12 @@ func main() {
 	// Load .env file
 	if err := godotenv.Load(".env.dev"); err != nil {
 		log.Println("file .env.dev not found, using system env vars")
+	}
+
+	// JWT
+	jm, err := jwt.NewManager(os.Getenv("JWT_SECRET"), time.Hour)
+	if err != nil {
+		log.Fatalf("Failed to init JWT: %v", err)
 	}
 
 	// Connecting to db
@@ -69,7 +76,7 @@ func main() {
 	profileService := profile.NewProfileService(profileRepo, validate, imgStorage)
 	profileHandler := profile.NewProfileHandler(profileService)
 
-	r := profile.ProfileRouter(&profileHandler, pool, imgStorage)
+	r := profile.ProfileRouter(&profileHandler, pool, imgStorage, jm)
 
 	// Consumer for auth-service's user.registered events
 	consumerCtx, consumerCancel := context.WithCancel(context.Background())

@@ -1,19 +1,20 @@
 package likes
 
 import (
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/jwt"
 	"github.com/ArtemYarin/pinterest-clone-api/pkg/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func LikeRouter(handler *LikeHandler, pool *pgxpool.Pool) chi.Router {
+func LikeRouter(handler *LikeHandler, pool *pgxpool.Pool, jm *jwt.Manager) chi.Router {
 	r := chi.NewRouter()
 
 	r.Get("/health", Health(pool))
 	r.Get("/{pinID}/like/count", handler.GetLikeCount)
 
 	r.Group(func(r chi.Router) {
-		r.Use(middleware.AuthMiddleware)
+		r.Use(middleware.AuthMiddleware(jm))
 
 		r.Put("/{pinID}/like", handler.AddLike)
 		r.Delete("/{pinID}/like", handler.RemoveLike)

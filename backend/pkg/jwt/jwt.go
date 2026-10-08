@@ -2,37 +2,54 @@ package jwt
 
 import (
 	"errors"
-	"os"
+	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
 
-var secretKey = []byte(os.Getenv("JWT_SECRET"))
+const minSecretLen = 32
 
 type Claims struct {
 	UserID uuid.UUID `json:"user_id"`
 	jwt.RegisteredClaims
 }
 
-func GenerateToken(userID uuid.UUID) (string, error) {
+type Manager struct {
+	secret []byte
+	ttl    time.Duration
+}
+
+func NewManager(secret string, ttl time.Duration) (*Manager, error) {
+	if len(secret) < minSecretLen {
+		return nil, fmt.Errorf("JWT secret must be at least %d bytes", minSecretLen)
+	}
+	return &Manager{secret: []byte(secret), ttl: ttl}, nil
+}
+
+// Generates a JWT token using HS256
+func (m *Manager) GenerateToken(userID uuid.UUID) (string, error) {
 	claims := Claims{
 		UserID: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(m.ttl)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			Issuer:    "pinterest-clone-api",
 			ID:        uuid.NewString(),
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(secretKey)
+	return token.SignedString(m.secret)
 }
 
-func ValidateToken(tokenStr string) (*Claims, error) {
+// Checks signing method, validates token and returns claims.
+func (m *Manager) ValidateToken(tokenStr string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (any, error) {
-		return secretKey, nil
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		}
+		return m.secret, nil
 	})
 
 	if err != nil {

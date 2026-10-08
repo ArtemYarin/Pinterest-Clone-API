@@ -40,10 +40,11 @@ type userService struct {
 	repo      UserRepository
 	validate  *validator.Validate
 	publisher *rmq.Publisher
+	tokens    *jwt.Manager
 }
 
-func NewUserService(repo UserRepository, validate *validator.Validate, publisher *rmq.Publisher) UserService {
-	return &userService{repo: repo, validate: validate, publisher: publisher}
+func NewUserService(repo UserRepository, validate *validator.Validate, publisher *rmq.Publisher, tokens *jwt.Manager) UserService {
+	return &userService{repo: repo, validate: validate, publisher: publisher, tokens: tokens}
 }
 
 func (s *userService) RegisterUser(ctx context.Context, user CredentialsUserRequest) (*UserWithTokenResponse, error) {
@@ -74,7 +75,7 @@ func (s *userService) RegisterUser(ctx context.Context, user CredentialsUserRequ
 	}
 
 	// Token
-	token, err := jwt.GenerateToken(u.Id)
+	token, err := s.tokens.GenerateToken(u.Id)
 	if err != nil {
 		return nil, fmt.Errorf("generate token: %w:", err)
 	}
@@ -130,7 +131,7 @@ func (s *userService) LoginUser(ctx context.Context, user CredentialsUserRequest
 	}
 
 	// Token
-	token, err := jwt.GenerateToken(storedUser.Id)
+	token, err := s.tokens.GenerateToken(storedUser.Id)
 	if err != nil {
 		return nil, fmt.Errorf("generate token: %w:", err)
 	}
@@ -234,7 +235,7 @@ func (s *userService) RevokeRefreshTokenByHash(ctx context.Context, token string
 }
 
 func (s *userService) IssueAccessToken(userID uuid.UUID) (string, error) {
-	token, err := jwt.GenerateToken(userID)
+	token, err := s.tokens.GenerateToken(userID)
 	if err != nil {
 		return "", fmt.Errorf("generate token: %w", err)
 	}

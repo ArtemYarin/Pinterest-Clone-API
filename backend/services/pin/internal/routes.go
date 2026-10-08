@@ -1,12 +1,13 @@
 package pin
 
 import (
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/jwt"
 	"github.com/ArtemYarin/pinterest-clone-api/pkg/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func PinRouter(handler *PinHandler, pinPool *pgxpool.Pool, imgStorage *ImageStorage) chi.Router {
+func PinRouter(handler *PinHandler, pinPool *pgxpool.Pool, imgStorage *ImageStorage, jm *jwt.Manager) chi.Router {
 	r := chi.NewRouter()
 
 	r.Get("/health", Health(pinPool, imgStorage))
@@ -15,7 +16,7 @@ func PinRouter(handler *PinHandler, pinPool *pgxpool.Pool, imgStorage *ImageStor
 	r.Get("/", handler.GetPins)
 
 	r.Group(func(r chi.Router) {
-		r.Use(middleware.AuthMiddleware)
+		r.Use(middleware.AuthMiddleware(jm))
 
 		r.Post("/", handler.CreatePin)
 		r.Patch("/{id}", handler.UpdatePin)

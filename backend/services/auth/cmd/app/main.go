@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/jwt"
 	"github.com/ArtemYarin/pinterest-clone-api/pkg/postgres"
 	auth "github.com/ArtemYarin/pinterest-clone-api/services/auth-service/internal"
 	"github.com/go-playground/validator/v10"
@@ -20,6 +21,12 @@ func main() {
 	// Load .env file
 	if err := godotenv.Load(".env.dev"); err != nil {
 		log.Println("file .env not found, using system env vars")
+	}
+
+	// JWT
+	jm, err := jwt.NewManager(os.Getenv("JWT_SECRET"), time.Hour)
+	if err != nil {
+		log.Fatalf("Failed to init JWT: %v", err)
 	}
 
 	// Connecting to db
@@ -69,10 +76,10 @@ func main() {
 
 	// Wiring
 	userRepo := auth.NewUserRepository(pool)
-	userService := auth.NewUserService(userRepo, validate, publisher)
+	userService := auth.NewUserService(userRepo, validate, publisher, jm)
 	userHandler := auth.NewUserHandler(userService)
 
-	r := auth.UserRouter(&userHandler, pool)
+	r := auth.UserRouter(&userHandler, pool, jm)
 
 	// Server setup
 	srv := http.Server{
