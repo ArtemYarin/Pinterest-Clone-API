@@ -99,6 +99,7 @@ func (h *PinHandler) GetPins(w http.ResponseWriter, r *http.Request) {
 	pins, count, err := h.service.GetPins(r.Context(), filters)
 	if err != nil {
 		WriteJSONError(err, w)
+		return
 	}
 
 	// Response with metadata
