@@ -225,14 +225,14 @@ services:
     image: redis:8.8-alpine
     container_name: redis-server
     restart: unless-stopped
-    ports:
-      - "6379:6379"
+    environment:
+     REDISCLI_AUTH: ${REDIS_PASSWORD}
     volumes:
       - redis_data:/data
       - ./backend/services/interaction/redis.conf:/usr/local/etc/redis/redis.conf
-    command: redis-server /usr/local/etc/redis/redis.conf --requirepass ${REDIS_PASSWORD}
+    command: redis-server /usr/local/etc/redis/redis.conf --requirepass "${REDIS_PASSWORD}"
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "--no-auth-warning", "ping"]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
