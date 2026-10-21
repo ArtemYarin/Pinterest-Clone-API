@@ -68,6 +68,20 @@ Seeded account: `seed@example.com` / `SeedPassword123!`
 
 To regenerate the gRPC code, run `sh backend/proto/gen.sh`.
 
+## Testing
+
+Run from a service directory, e.g. `backend/services/pin`:
+
+| Command                                            | Runs                                                                           |
+| -------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `go test ./...`                                    | Unit tests: service logic with testify mocks, HTTP handlers via `httptest`     |
+| `go test -tags integration ./...`                  | Plus integration tests against real Postgres 18 (testcontainers, needs Docker) |
+| `go test ./internal/ -bench . -benchmem -run '^$'` | Benchmarks                                                                     |
+
+- **Unit tests** are table-driven. Each case registers only the mock calls it expects, and an unexpected call fails the test.
+- **Integration tests** start one Postgres container per run and apply the real migrations, so the schema, constraints and defaults are the production ones.
+- **Benchmarks** measure the feed hot path (signing a presigned download URL per pin) with a real offline-signing S3 client, plus filter parsing and JSON encoding.
+
 ## Repository layout
 
 ```

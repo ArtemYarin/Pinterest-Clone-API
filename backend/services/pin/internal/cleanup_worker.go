@@ -13,7 +13,7 @@ import (
 // pending pin row.
 type CleanupWorker struct {
 	repo      PinRepository
-	storage   *ImageStorage
+	storage   ImageStore
 	interval  time.Duration
 	ttl       time.Duration
 	batchSize int
@@ -22,7 +22,7 @@ type CleanupWorker struct {
 	wg        sync.WaitGroup
 }
 
-func NewCleanupWorker(repo PinRepository, storage *ImageStorage, interval, ttl time.Duration, batchSize int) *CleanupWorker {
+func NewCleanupWorker(repo PinRepository, storage ImageStore, interval, ttl time.Duration, batchSize int) *CleanupWorker {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &CleanupWorker{
 		repo:      repo,
