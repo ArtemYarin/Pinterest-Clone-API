@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
+	"github.com/minio/minio-go/v7"
 )
 
 var allowedImageContentTypes = map[string]bool{
@@ -29,13 +30,21 @@ type PinService interface {
 	ConfirmUpload(ctx context.Context, id string, userID uuid.UUID) (*PinResponse, error)
 }
 
+// ImageStore is the subset of object storage operations the service layer needs
+type ImageStore interface {
+	GenerateUploadURL(ctx context.Context, objectKey string, expiry time.Duration) (string, error)
+	GenerateDownloadURL(ctx context.Context, objectKey string, expiry time.Duration) (string, error)
+	StatObject(ctx context.Context, objectKey string) (minio.ObjectInfo, error)
+	RemoveObject(ctx context.Context, objectKey string) error
+}
+
 type pinService struct {
 	repo       PinRepository
 	validate   *validator.Validate
-	imgStorage *ImageStorage
+	imgStorage ImageStore
 }
 
-func NewPinService(repo PinRepository, validate *validator.Validate, imgStorage *ImageStorage) PinService {
+func NewPinService(repo PinRepository, validate *validator.Validate, imgStorage ImageStore) PinService {
 	return &pinService{repo: repo, validate: validate, imgStorage: imgStorage}
 }
 
@@ -47,20 +56,20 @@ func (s *pinService) CreatePin(ctx context.Context, userID uuid.UUID, pin Create
 		return nil, fmt.Errorf("input validation: %w", valErr)
 	}
 
-	// Upload image
+	// Generate image key and presigned upload url
 	imageKey := fmt.Sprintf("pins/%s/%s", userID, uuid.New().String())              // MiniO identifier
 	uploadURL, err := s.imgStorage.GenerateUploadURL(ctx, imageKey, 15*time.Minute) // temporary upload url
 	if err != nil {
 		return nil, fmt.Errorf("generate image upload URL: %w", err)
 	}
 
-	// Repository call
+	// Repository call to create pin metadata
 	p, err := s.repo.CreatePin(ctx, userID, imageKey, pin)
 	if err != nil {
 		return nil, fmt.Errorf("create pin in repository: %w", err)
 	}
 
-	// Response
+	// Response with new pin object and presigned upload url
 	resp := UploadImgPinResponse{
 		Pin:        *p,
 		Upload_url: uploadURL,
@@ -70,6 +79,7 @@ func (s *pinService) CreatePin(ctx context.Context, userID uuid.UUID, pin Create
 }
 
 func (s *pinService) GetPinByID(ctx context.Context, id string) (*DownloadImgPinResponse, error) {
+	// Get pin fron repository
 	pin, err := s.repo.GetPinByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("get pin from repository: %w", err)

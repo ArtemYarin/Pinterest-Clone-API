@@ -11,6 +11,9 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
+// ImageStorage has bucket and 2 clients.
+// Internal for backend to Garage communication,
+// and external for presigned URLs accessed through the browser.
 type ImageStorage struct {
 	client        *minio.Client
 	presignClient *minio.Client
@@ -31,6 +34,8 @@ func NewImageStorage(ctx context.Context, internalEndpoint, publicEndpoint, acce
 	}
 
 	// Client used ONLY to build presigned URLs used outside Docker
+	// Generating a presigned URL makes no network calls, it's pure local math.
+	// Bekause of that, external client doesn't need to be reachable from inside the container
 	presignClient, err := minio.New(publicEndpoint, &minio.Options{
 		Creds:  creds,
 		Secure: useSSL,
