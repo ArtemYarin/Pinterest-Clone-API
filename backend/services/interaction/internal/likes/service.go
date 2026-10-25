@@ -2,13 +2,9 @@ package likes
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"strconv"
 
 	"github.com/google/uuid"
-	"github.com/redis/go-redis/v9"
-	"golang.org/x/sync/errgroup"
 )
 
 type LikeService interface {
@@ -21,89 +17,33 @@ type LikeService interface {
 }
 
 type likeService struct {
-	repo  LikeRepository
-	redis *redis.Client
+	repo LikeRepository
 }
 
-func NewLikeService(repo LikeRepository, redis *redis.Client) LikeService {
-	return &likeService{repo: repo, redis: redis}
+func NewLikeService(repo LikeRepository) LikeService {
+	return &likeService{repo: repo}
 }
 
 func (s *likeService) AddLike(ctx context.Context, userID, pinID uuid.UUID) error {
-	inserted, err := s.repo.AddLike(ctx, userID, pinID)
-	if err != nil {
+	if _, err := s.repo.AddLike(ctx, userID, pinID); err != nil {
 		return fmt.Errorf("add like in repository: %w", err)
-	}
-	if inserted {
-		if err := s.applyDelta(ctx, pinID, 1); err != nil {
-			return fmt.Errorf("incr like count in redis: %w", err)
-		}
 	}
 	return nil
 }
 
-// applyDelta changes the pending like count delta in Redis and marks the pin dirty.
-// The delta is applied before the dirty mark so the worker never clears a mark
-// for a delta it hasn't seen yet.
-func (s *likeService) applyDelta(ctx context.Context, pinID uuid.UUID, delta int64) error {
-	_, err := s.redis.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
-		pipe.IncrBy(ctx, fmt.Sprintf("likes:count:%s", pinID.String()), delta)
-		pipe.SAdd(ctx, "likes:dirty", pinID.String())
-		return nil
-	})
-	return err
-}
-
 func (s *likeService) RemoveLike(ctx context.Context, userID, pinID uuid.UUID) error {
-	deleted, err := s.repo.RemoveLike(ctx, userID, pinID)
-	if err != nil {
+	if _, err := s.repo.RemoveLike(ctx, userID, pinID); err != nil {
 		return fmt.Errorf("remove like in repository: %w", err)
-	}
-	if deleted {
-		if err := s.applyDelta(ctx, pinID, -1); err != nil {
-			return fmt.Errorf("decr like count in redis: %w", err)
-		}
 	}
 	return nil
 }
 
 func (s *likeService) GetLikeCount(ctx context.Context, pinID uuid.UUID) (*int64, error) {
-	var dbCount *int64
-	var redisCount int64
-
-	var g errgroup.Group
-
-	g.Go(func() error {
-		c, err := s.repo.GetLikeCount(ctx, pinID)
-		if err != nil {
-			return fmt.Errorf("get like count from repository: %w", err)
-		}
-		dbCount = c
-		return nil
-	})
-
-	g.Go(func() error {
-		redisCountStr, err := s.redis.Get(ctx, fmt.Sprintf("likes:count:%s", pinID)).Result()
-		if err != nil {
-			if errors.Is(err, redis.Nil) {
-				redisCount = 0
-				return nil
-			}
-			return fmt.Errorf("get like count from redis key: %s: %w", pinID, err)
-		}
-		redisCount, err = strconv.ParseInt(redisCountStr, 10, 64)
-		if err != nil {
-			return fmt.Errorf("convert redis count %q to int64: %w", redisCountStr, err)
-		}
-		return nil
-	})
-
-	if err := g.Wait(); err != nil {
-		return nil, err
+	c, err := s.repo.GetLikeCount(ctx, pinID)
+	if err != nil {
+		return nil, fmt.Errorf("get like count from repository: %w", err)
 	}
-
-	resp := *dbCount + redisCount
-	return &resp, nil
+	return c, nil
 }
 
 func (s *likeService) HasLiked(ctx context.Context, userID, pinID uuid.UUID) (*bool, error) {

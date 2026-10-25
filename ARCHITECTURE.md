@@ -24,7 +24,6 @@ flowchart LR
         DBP[(Postgres<br/>pin)]
         DBI[(Postgres<br/>interaction)]
         DBR[(Postgres<br/>profile)]
-        R[(Redis)]
         S3[(Garage S3)]
         MQ{{RabbitMQ}}
     end
@@ -38,7 +37,6 @@ flowchart LR
     PIN --> DBP
     INT --> DBI
     PROF --> DBR
-    INT --> R
     PIN --> S3
     PROF --> S3
 
@@ -51,7 +49,7 @@ flowchart LR
 | **gateway**     | Single entry point; proxies to the services and composes cross-service endpoints | chi, `httputil.ReverseProxy`, gRPC clients, embedded OpenAPI |
 | **auth**        | Signup, login, JWT access tokens, rotating refresh tokens                        | bcrypt, HttpOnly cookies, RabbitMQ publisher                 |
 | **pin**         | Pin CRUD, presigned uploads, cleanup of abandoned uploads                        | minio-go on Garage S3, gRPC server                           |
-| **interaction** | Likes and like counts                                                            | Redis write-behind buffer, gRPC server                       |
+| **interaction** | Likes and like counts                                                            | Transactional like counter, gRPC server                      |
 | **profile**     | User profiles and avatars                                                        | RabbitMQ consumer, presigned uploads                         |
 
 Each service owns its own Postgres database. Cross-service references are plain IDs with no foreign keys.

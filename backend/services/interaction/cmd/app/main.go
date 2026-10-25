@@ -17,7 +17,6 @@ import (
 	likesgrpc "github.com/ArtemYarin/pinterest-clone-api/services/interaction-service/internal/likes/grpc"
 	"github.com/ArtemYarin/pinterest-clone-api/services/interaction-service/internal/shared/db"
 	"github.com/joho/godotenv"
-	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 )
 
@@ -49,22 +48,9 @@ func main() {
 	defer pool.Close()
 	log.Println("Connected to PostgreSQL successfully")
 
-	// Redis
-	redisClient := redis.NewClient(&redis.Options{
-		Addr:     os.Getenv("REDIS_ADDR"),
-		Password: os.Getenv("REDIS_PASSWORD"),
-	})
-	log.Println("Connected to Redis successfully")
-
-	// Flush worker
-	w := likes.NewWorker(pool, redisClient, 30*time.Second)
-	w.Start()
-	defer w.Stop()
-	log.Println("Started background worker successfully")
-
 	// Wiring
 	likeRepo := likes.NewLikeRepository(pool)
-	likeService := likes.NewLikeService(likeRepo, redisClient)
+	likeService := likes.NewLikeService(likeRepo)
 	likeHandler := likes.NewLikeHandler(likeService)
 
 	r := likes.LikeRouter(&likeHandler, pool, jm)

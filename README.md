@@ -5,7 +5,6 @@ A Pinterest-style image-sharing app built on **Go microservices**, with a React 
 ![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)
 ![gRPC](https://img.shields.io/badge/gRPC-244c5a?logo=grpc&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-4169E1?logo=postgresql&logoColor=white)
-![Redis](https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white)
 ![RabbitMQ](https://img.shields.io/badge/RabbitMQ-FF6600?logo=rabbitmq&logoColor=white)
 ![S3](https://img.shields.io/badge/S3-Garage-569A31?logo=amazons3&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
@@ -31,7 +30,7 @@ See [Architecture](ARCHITECTURE.md) for a deep dive into how it works.
 
 - **Direct-to-S3 uploads.** The browser `PUT`s the image straight to object storage with a presigned URL, so the API never streams file bytes. A confirm step validates the stored object with `StatObject` (content type and size). Pins stay `pending` until confirmed, and a background worker removes abandoned uploads, using a partial index on `image_status = 'pending'` to find them.
 - **Two S3 clients.** The pin service talks to Garage over the internal Docker network but signs URLs with a public-endpoint client, so the presigned links resolve from the browser.
-- **Write-behind like counter.** Likes increment a Redis delta and mark the pin dirty in one `MULTI`. Every 30s a worker drains deltas with `GETDEL` and upserts them into Postgres, putting a delta back if the write fails. Reads combine the DB and Redis values in parallel with `errgroup`.
+- **Transactional like counter.** A like or unlike writes `pin_likes` and upserts the pin's row in `like_counts` in one Postgres transaction, so the count is always consistent and reads are a single primary-key lookup.
 - **Idempotent likes.** A repeated like or unlike is a no-op, and only real state changes touch the counter.
 - **Token-bucket rate limiter.** Per-IP buckets with fractional refill and standard `RateLimit-*` / `Retry-After` headers.
 - **Self-contained stack.** Every dependency has a healthcheck. Migrations and the seeder run as one-shot compose jobs, and services start only after them (`service_completed_successfully`). Services shut down gracefully on SIGINT/SIGTERM.
@@ -50,7 +49,7 @@ git clone https://github.com/ArtemYarin/Pinterest-Clone-API
 cd Pinterest-Clone-API
 
 cp .env.example .env
-docker compose up -d --build         # Backend, databases, Redis, RabbitMQ, Garage, seed data
+docker compose up -d --build         # Backend, databases, RabbitMQ, Garage, seed data
 
 cd frontend
 cp .env.local.example .env.local

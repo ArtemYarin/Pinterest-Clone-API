@@ -221,22 +221,6 @@ services:
       retries: 5
       start_period: 10s
 
-  redis:
-    image: redis:8.8-alpine
-    container_name: redis-server
-    restart: unless-stopped
-    environment:
-     REDISCLI_AUTH: ${REDIS_PASSWORD}
-    volumes:
-      - redis_data:/data
-      - ./backend/services/interaction/redis.conf:/usr/local/etc/redis/redis.conf
-    command: redis-server /usr/local/etc/redis/redis.conf --requirepass "${REDIS_PASSWORD}"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   migrate-interaction:
     image: migrate/migrate
     volumes:
@@ -256,8 +240,6 @@ services:
     depends_on:
       migrate-interaction:
         condition: service_completed_successfully
-      redis:
-        condition: service_healthy
     environment:
       INTERACTION_PORT: ${INTERACTION_PORT}
       INTERACTION_GRPC_PORT: ${INTERACTION_GRPC_PORT}
@@ -266,8 +248,6 @@ services:
       POSTGRES_HOST: ${INTERACTION_POSTGRES_HOST}
       POSTGRES_PORT: ${INTERACTION_POSTGRES_PORT}
       POSTGRES_DB: ${INTERACTION_POSTGRES_DB}
-      REDIS_ADDR: ${REDIS_ADDR}
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
     ports:
       - "8083:8080"
@@ -338,5 +318,4 @@ volumes:
   pgdata-pin:
   garage-data:
   pgdata-interaction:
-  redis_data:
   pgdata-profile:

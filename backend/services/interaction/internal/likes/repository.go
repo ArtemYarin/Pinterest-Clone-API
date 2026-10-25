@@ -6,6 +6,7 @@ import (
 
 	"github.com/ArtemYarin/pinterest-clone-api/services/interaction-service/internal/shared/errs"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -26,38 +27,69 @@ func NewLikeRepository(db *pgxpool.Pool) LikeRepository {
 	return &likeRepository{db: db}
 }
 
-// AddLike adds creates pin_likes instance if it didn't exist before.
+// AddLike creates pin_likes instance if it didn't exist before and increments
+// the pin's like_counts row in the same transaction.
 // It returns true if pin_likes was created and false if didn't (for example: conflict)
 func (r *likeRepository) AddLike(ctx context.Context, userID, pinID uuid.UUID) (bool, error) {
-	tag, err := r.db.Exec(ctx,
-		`INSERT INTO pin_likes (user_id, pin_id) VALUES ($1, $2)
-		 ON CONFLICT (user_id, pin_id) DO NOTHING`,
-		userID, pinID)
+	inserted := false
+	err := pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx,
+			`INSERT INTO pin_likes (user_id, pin_id) VALUES ($1, $2)
+			 ON CONFLICT (user_id, pin_id) DO NOTHING`,
+			userID, pinID)
+		if err != nil {
+			return fmt.Errorf("insert pin_likes: %w", err)
+		}
+		if tag.RowsAffected() == 0 {
+			return nil
+		}
+		inserted = true
+
+		_, err = tx.Exec(ctx,
+			`INSERT INTO like_counts (target_id, count, updated_at)
+			 VALUES ($1, 1, now())
+			 ON CONFLICT (target_id)
+			 DO UPDATE SET count = like_counts.count + 1, updated_at = now()`,
+			pinID)
+		if err != nil {
+			return fmt.Errorf("increment like_counts: %w", err)
+		}
+		return nil
+	})
 	if err != nil {
 		return false, fmt.Errorf("AddLike user %v pin %v: %w", userID, pinID, err)
-	}
-
-	inserted := false
-
-	if tag.RowsAffected() != 0 {
-		inserted = true
 	}
 	return inserted, nil
 }
 
-// RemoveLike deletes pin_likes instance if it exists.
+// RemoveLike deletes pin_likes instance if it exists and decrements
+// the pin's like_counts row in the same transaction.
 // It returns true if pin_likes was deleted and false if didn't
 func (r *likeRepository) RemoveLike(ctx context.Context, userID, pinID uuid.UUID) (bool, error) {
-	tag, err := r.db.Exec(ctx,
-		`DELETE FROM pin_likes WHERE user_id = $1 AND pin_id = $2`,
-		userID, pinID)
+	deleted := false
+	err := pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx,
+			`DELETE FROM pin_likes WHERE user_id = $1 AND pin_id = $2`,
+			userID, pinID)
+		if err != nil {
+			return fmt.Errorf("delete pin_likes: %w", err)
+		}
+		if tag.RowsAffected() == 0 {
+			return nil
+		}
+		deleted = true
+
+		_, err = tx.Exec(ctx,
+			`UPDATE like_counts SET count = GREATEST(count - 1, 0), updated_at = now()
+			 WHERE target_id = $1`,
+			pinID)
+		if err != nil {
+			return fmt.Errorf("decrement like_counts: %w", err)
+		}
+		return nil
+	})
 	if err != nil {
 		return false, fmt.Errorf("RemoveLike user %v pin %v: %w", userID, pinID, err)
-	}
-
-	deleted := false
-	if tag.RowsAffected() != 0 {
-		deleted = true
 	}
 	return deleted, nil
 }
