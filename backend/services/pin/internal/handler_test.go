@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/httpx"
 	"github.com/ArtemYarin/pinterest-clone-api/pkg/jwt"
 	"github.com/ArtemYarin/pinterest-clone-api/pkg/middleware"
 	"github.com/go-chi/chi/v5"
@@ -79,7 +80,7 @@ func TestPinHandler_CreatePin(t *testing.T) {
 			claims: claims,
 			setup: func(svc *mockPinService) {
 				svc.On("CreatePin", mock.Anything, claims.UserID, CreatePinRequest{Title: ""}).
-					Return(nil, newValidationErr(map[string]string{"Title": "Title is required"}))
+					Return(nil, httpx.NewValidationErr(map[string]string{"Title": "Title is required"}))
 			},
 			wantStatus: http.StatusUnprocessableEntity,
 		},
@@ -161,7 +162,7 @@ func TestPinHandler_GetPinByID(t *testing.T) {
 
 func TestPinHandler_GetPins_ServiceError(t *testing.T) {
 	h, svc := newTestHandler(t)
-	svc.On("GetPins", mock.Anything, mock.Anything).Return(nil, 0, errInternalServer)
+	svc.On("GetPins", mock.Anything, mock.Anything).Return(nil, 0, httpx.ErrInternalServer)
 	w := httptest.NewRecorder()
 
 	h.GetPins(w, newPinRequest(http.MethodGet, "/", "", "", nil))
@@ -179,10 +180,10 @@ func TestWriteJSONError(t *testing.T) {
 		err        error
 		wantStatus int
 	}{
-		{newValidationErr(map[string]string{"Title": "Title is required"}), http.StatusUnprocessableEntity},
-		{errBadRequest, http.StatusBadRequest},
-		{errUnauthorized, http.StatusUnauthorized},
-		{errForbidden, http.StatusForbidden},
+		{httpx.NewValidationErr(map[string]string{"Title": "Title is required"}), http.StatusUnprocessableEntity},
+		{httpx.ErrBadRequest, http.StatusBadRequest},
+		{httpx.ErrUnauthorized, http.StatusUnauthorized},
+		{httpx.ErrForbidden, http.StatusForbidden},
 		{errPinNotFound, http.StatusNotFound},
 		{errImageURLExists, http.StatusConflict},
 		{errImageInvalid, http.StatusUnprocessableEntity},
@@ -195,7 +196,7 @@ func TestWriteJSONError(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			// Wrapped like the handlers do, so the mapping must unwrap the chain
-			WriteJSONError(fmt.Errorf("handler: %w", tt.err), w)
+			httpx.WriteJSONError(fmt.Errorf("handler: %w", tt.err), w)
 
 			assert.Equal(t, tt.wantStatus, w.Code)
 		})

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/httpx"
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/postgres"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -37,7 +39,7 @@ func (r *pinRepository) CreatePin(ctx context.Context, userID uuid.UUID, imageUR
 		userID, pin.Title, imageURL, pin.Description).
 		Scan(&p.Id, &p.User_id, &p.Title, &p.Image_url, &p.Image_status, &p.Description, &p.Created_at, &p.Updated_at, &p.Likes)
 	if err != nil {
-		if isDuplicateErr(err) {
+		if postgres.IsDuplicateErr(err) {
 			return nil, fmt.Errorf("image url %v already exists: %w", imageURL, errImageURLExists)
 		}
 		return nil, fmt.Errorf("CreatePin %v: %v", pin, err)
@@ -52,7 +54,7 @@ func (r *pinRepository) GetPinByID(ctx context.Context, id string) (*PinResponse
 		 FROM pins WHERE id = $1`, id).
 		Scan(&p.Id, &p.User_id, &p.Title, &p.Image_url, &p.Image_status, &p.Description, &p.Created_at, &p.Updated_at, &p.Likes)
 	if err != nil {
-		if isNotFoundErr(err) {
+		if postgres.IsNotFoundErr(err) {
 			return nil, fmt.Errorf("id %s not found: %w", id, errPinNotFound)
 		}
 		return nil, fmt.Errorf("GetPinByID id %v: %v", id, err)
@@ -94,7 +96,7 @@ func (r *pinRepository) GetPins(ctx context.Context, filters PinFilters) ([]PinR
 
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, 0, fmt.Errorf("GetPins: %v: %w", err, errInternalServer)
+		return nil, 0, fmt.Errorf("GetPins: %v: %w", err, httpx.ErrInternalServer)
 	}
 	defer rows.Close()
 
@@ -102,13 +104,13 @@ func (r *pinRepository) GetPins(ctx context.Context, filters PinFilters) ([]PinR
 	for rows.Next() {
 		var p PinResponse
 		if err := rows.Scan(&p.Id, &p.User_id, &p.Title, &p.Image_url, &p.Image_status, &p.Description, &p.Created_at, &p.Updated_at, &p.Likes); err != nil {
-			return nil, 0, fmt.Errorf("unable to scan pin: %v: %w", err, errInternalServer)
+			return nil, 0, fmt.Errorf("unable to scan pin: %v: %w", err, httpx.ErrInternalServer)
 		}
 		pins = append(pins, p)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, 0, fmt.Errorf("scan rows: %v: %w", err, errInternalServer)
+		return nil, 0, fmt.Errorf("scan rows: %v: %w", err, httpx.ErrInternalServer)
 	}
 
 	// Total pins count
@@ -132,7 +134,7 @@ func (r *pinRepository) GetPins(ctx context.Context, filters PinFilters) ([]PinR
 	var count int
 	err = r.db.QueryRow(ctx, countQuery, countArgs...).Scan(&count)
 	if err != nil {
-		return nil, 0, fmt.Errorf("counting pins: %v: %w", err, errInternalServer)
+		return nil, 0, fmt.Errorf("counting pins: %v: %w", err, httpx.ErrInternalServer)
 	}
 
 	return pins, count, nil
@@ -148,7 +150,7 @@ func (r *pinRepository) GetPinsByIDs(ctx context.Context, ids uuid.UUIDs) ([]Pin
 		`SELECT id, user_id, title, image_url, image_status, description, created_at, updated_at, likes
 		 FROM pins WHERE id = ANY($1) AND image_status = 'confirmed'`, ids)
 	if err != nil {
-		return nil, fmt.Errorf("GetPinsByIDs (%d ids): %v: %w", len(ids), err, errInternalServer)
+		return nil, fmt.Errorf("GetPinsByIDs (%d ids): %v: %w", len(ids), err, httpx.ErrInternalServer)
 	}
 	defer rows.Close()
 
@@ -156,12 +158,12 @@ func (r *pinRepository) GetPinsByIDs(ctx context.Context, ids uuid.UUIDs) ([]Pin
 	for rows.Next() {
 		var p PinResponse
 		if err := rows.Scan(&p.Id, &p.User_id, &p.Title, &p.Image_url, &p.Image_status, &p.Description, &p.Created_at, &p.Updated_at, &p.Likes); err != nil {
-			return nil, fmt.Errorf("unable to scan pin: %v: %w", err, errInternalServer)
+			return nil, fmt.Errorf("unable to scan pin: %v: %w", err, httpx.ErrInternalServer)
 		}
 		pins = append(pins, p)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("scan rows: %v: %w", err, errInternalServer)
+		return nil, fmt.Errorf("scan rows: %v: %w", err, httpx.ErrInternalServer)
 	}
 
 	return pins, nil
@@ -183,7 +185,7 @@ func (r *pinRepository) UpdatePin(ctx context.Context, pin UpdatePinRequest) err
 		argIndex++
 	}
 	if len(args) == 0 {
-		return fmt.Errorf("no fields to update: %w", errBadRequest)
+		return fmt.Errorf("no fields to update: %w", httpx.ErrBadRequest)
 	}
 
 	query += fmt.Sprintf(" WHERE id = $%d", argIndex)
@@ -191,7 +193,7 @@ func (r *pinRepository) UpdatePin(ctx context.Context, pin UpdatePinRequest) err
 
 	tag, err := r.db.Exec(ctx, query, args...)
 	if err != nil {
-		if isDuplicateErr(err) {
+		if postgres.IsDuplicateErr(err) {
 			return fmt.Errorf("image url already exists: %w", errImageURLExists)
 		}
 		return fmt.Errorf("UpdatePin: %w", err)

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/httpx"
 	"github.com/ArtemYarin/pinterest-clone-api/pkg/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -24,98 +25,98 @@ func (h *ProfileHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := h.service.GetProfile(r.Context(), userID)
 	if err != nil {
-		WriteJSONError(fmt.Errorf("get profile: %w", err), w)
+		httpx.WriteJSONError(fmt.Errorf("get profile: %w", err), w)
 		return
 	}
 
-	WriteJSON(w, 200, resp)
+	httpx.WriteJSON(w, 200, resp)
 }
 
 func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	userID := chi.URLParam(r, "userId")
 
-	if !IsValidUUID(userID) {
-		WriteJSONError(fmt.Errorf("update profile: %w", errBadRequest), w)
+	if !httpx.IsValidUUID(userID) {
+		httpx.WriteJSONError(fmt.Errorf("update profile: %w", httpx.ErrBadRequest), w)
 		return
 	}
 
 	var req UpdateProfileRequest
-	if err := DecodeJSON(&req, r); err != nil {
-		WriteJSONError(err, w)
+	if err := httpx.DecodeJSON(&req, r); err != nil {
+		httpx.WriteJSONError(err, w)
 		return
 	}
 
 	claims, ok := middleware.GetUserClaims(r)
 	if !ok {
-		WriteJSONError(errUnauthorized, w)
+		httpx.WriteJSONError(httpx.ErrUnauthorized, w)
 		return
 	}
 	if claims.UserID.String() != userID {
-		WriteJSONError(errForbidden, w)
+		httpx.WriteJSONError(httpx.ErrForbidden, w)
 		return
 	}
 	req.UserID = claims.UserID
 
 	if err := h.service.UpdateProfile(r.Context(), claims.UserID, req); err != nil {
-		WriteJSONError(fmt.Errorf("update profile: %w", err), w)
+		httpx.WriteJSONError(fmt.Errorf("update profile: %w", err), w)
 		return
 	}
 
-	WriteJSON(w, 200, "Updated successfully")
+	httpx.WriteJSON(w, 200, "Updated successfully")
 }
 
 func (h *ProfileHandler) GenerateAvatarUploadURL(w http.ResponseWriter, r *http.Request) {
 	userID := chi.URLParam(r, "userId")
 
-	if !IsValidUUID(userID) {
-		WriteJSONError(fmt.Errorf("avatar upload url: %w", errBadRequest), w)
+	if !httpx.IsValidUUID(userID) {
+		httpx.WriteJSONError(fmt.Errorf("avatar upload url: %w", httpx.ErrBadRequest), w)
 		return
 	}
 
 	claims, ok := middleware.GetUserClaims(r)
 	if !ok {
-		WriteJSONError(errUnauthorized, w)
+		httpx.WriteJSONError(httpx.ErrUnauthorized, w)
 		return
 	}
 	if claims.UserID.String() != userID {
-		WriteJSONError(errForbidden, w)
+		httpx.WriteJSONError(httpx.ErrForbidden, w)
 		return
 	}
 
 	uploadURL, err := h.service.GenerateAvatarUploadURL(r.Context(), claims.UserID)
 	if err != nil {
-		WriteJSONError(fmt.Errorf("generate avatar upload url: %w", err), w)
+		httpx.WriteJSONError(fmt.Errorf("generate avatar upload url: %w", err), w)
 		return
 	}
 
-	WriteJSON(w, 200, UploadURLResponse{UploadURL: uploadURL})
+	httpx.WriteJSON(w, 200, UploadURLResponse{UploadURL: uploadURL})
 }
 
 func (h *ProfileHandler) ConfirmAvatarUpload(w http.ResponseWriter, r *http.Request) {
 	userID := chi.URLParam(r, "userId")
 
-	if !IsValidUUID(userID) {
-		WriteJSONError(fmt.Errorf("confirm avatar: %w", errBadRequest), w)
+	if !httpx.IsValidUUID(userID) {
+		httpx.WriteJSONError(fmt.Errorf("confirm avatar: %w", httpx.ErrBadRequest), w)
 		return
 	}
 
 	claims, ok := middleware.GetUserClaims(r)
 	if !ok {
-		WriteJSONError(errUnauthorized, w)
+		httpx.WriteJSONError(httpx.ErrUnauthorized, w)
 		return
 	}
 	if claims.UserID.String() != userID {
-		WriteJSONError(errForbidden, w)
+		httpx.WriteJSONError(httpx.ErrForbidden, w)
 		return
 	}
 
 	resp, err := h.service.ConfirmAvatarUpload(r.Context(), claims.UserID)
 	if err != nil {
-		WriteJSONError(fmt.Errorf("confirm avatar: %w", err), w)
+		httpx.WriteJSONError(fmt.Errorf("confirm avatar: %w", err), w)
 		return
 	}
 
-	WriteJSON(w, 200, resp)
+	httpx.WriteJSON(w, 200, resp)
 }
 
 // Health

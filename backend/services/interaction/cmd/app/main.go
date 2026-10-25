@@ -15,7 +15,6 @@ import (
 	"github.com/ArtemYarin/pinterest-clone-api/pkg/postgres"
 	"github.com/ArtemYarin/pinterest-clone-api/services/interaction-service/internal/likes"
 	likesgrpc "github.com/ArtemYarin/pinterest-clone-api/services/interaction-service/internal/likes/grpc"
-	"github.com/ArtemYarin/pinterest-clone-api/services/interaction-service/internal/shared/db"
 	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
 )
@@ -33,7 +32,7 @@ func main() {
 	}
 
 	// Postgres
-	dbUrl := db.GetInteractionPostgresDSN()
+	dbUrl := postgres.DSNFromEnv()
 	config := postgres.PoolConfig{
 		MaxConns:          25,
 		MinConns:          10,

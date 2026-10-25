@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ArtemYarin/pinterest-clone-api/services/interaction-service/internal/shared/errs"
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/postgres"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -102,7 +102,7 @@ func (r *likeRepository) GetLikeCount(ctx context.Context, pinID uuid.UUID) (*in
 		"SELECT count FROM like_counts WHERE target_id = $1", pinID).
 		Scan(&count)
 	if err != nil {
-		if errs.IsNotFoundErr(err) {
+		if postgres.IsNotFoundErr(err) {
 			zero := int64(0)
 			return &zero, nil
 		}

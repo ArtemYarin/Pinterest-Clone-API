@@ -36,7 +36,7 @@ func main() {
 	}
 
 	// Connecting to db
-	dbUrl := profile.GetProfilePostgresDSN()
+	dbUrl := postgres.DSNFromEnv()
 	config := postgres.PoolConfig{
 		MaxConns:          25,
 		MinConns:          10,

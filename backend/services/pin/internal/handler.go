@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/httpx"
 	"github.com/ArtemYarin/pinterest-clone-api/pkg/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -23,82 +24,82 @@ func NewPinHandler(s PinService) PinHandler {
 func (h *PinHandler) CreatePin(w http.ResponseWriter, r *http.Request) {
 	// Decode body
 	var pin CreatePinRequest
-	if err := DecodeJSON(&pin, r); err != nil {
-		WriteJSONError(err, w)
+	if err := httpx.DecodeJSON(&pin, r); err != nil {
+		httpx.WriteJSONError(err, w)
 		return
 	}
 
 	// User claims
 	claims, ok := middleware.GetUserClaims(r)
 	if !ok {
-		WriteJSONError(errUnauthorized, w)
+		httpx.WriteJSONError(httpx.ErrUnauthorized, w)
 		return
 	}
 
 	// Service call
 	resp, err := h.service.CreatePin(r.Context(), claims.UserID, pin)
 	if err != nil {
-		WriteJSONError(fmt.Errorf("create pin: %w", err), w)
+		httpx.WriteJSONError(fmt.Errorf("create pin: %w", err), w)
 		return
 	}
 
 	// Response writing
-	WriteJSON(w, http.StatusCreated, resp)
+	httpx.WriteJSON(w, http.StatusCreated, resp)
 }
 
 func (h *PinHandler) GetPinByID(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	if !IsValidUUID(id) {
-		WriteJSONError(fmt.Errorf("get pin: %w", errBadRequest), w)
+	if !httpx.IsValidUUID(id) {
+		httpx.WriteJSONError(fmt.Errorf("get pin: %w", httpx.ErrBadRequest), w)
 		return
 	}
 
 	// Service call
 	resp, err := h.service.GetPinByID(r.Context(), id)
 	if err != nil {
-		WriteJSONError(fmt.Errorf("get pin: %w", err), w)
+		httpx.WriteJSONError(fmt.Errorf("get pin: %w", err), w)
 		return
 	}
 
 	// Response writing
-	WriteJSON(w, 200, resp)
+	httpx.WriteJSON(w, 200, resp)
 }
 
 func (h *PinHandler) ConfirmUpload(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	if !IsValidUUID(id) {
-		WriteJSONError(fmt.Errorf("confirm upload: %w", errBadRequest), w)
+	if !httpx.IsValidUUID(id) {
+		httpx.WriteJSONError(fmt.Errorf("confirm upload: %w", httpx.ErrBadRequest), w)
 		return
 	}
 
 	claims, ok := middleware.GetUserClaims(r)
 	if !ok {
-		WriteJSONError(errUnauthorized, w)
+		httpx.WriteJSONError(httpx.ErrUnauthorized, w)
 		return
 	}
 
 	resp, err := h.service.ConfirmUpload(r.Context(), id, claims.UserID)
 	if err != nil {
-		WriteJSONError(fmt.Errorf("confirm upload: %w", err), w)
+		httpx.WriteJSONError(fmt.Errorf("confirm upload: %w", err), w)
 		return
 	}
 
-	WriteJSON(w, http.StatusOK, resp)
+	httpx.WriteJSON(w, http.StatusOK, resp)
 }
 
 func (h *PinHandler) GetPins(w http.ResponseWriter, r *http.Request) {
 	filters := ParseFilters(r)
 
 	if err := filters.Validate(); err != nil {
-		WriteJSONError(fmt.Errorf("validate query parameters: %w", err), w)
+		httpx.WriteJSONError(fmt.Errorf("validate query parameters: %w", err), w)
 		return
 	}
 
 	pins, count, err := h.service.GetPins(r.Context(), filters)
 	if err != nil {
-		WriteJSONError(err, w)
+		httpx.WriteJSONError(err, w)
 		return
 	}
 
@@ -116,68 +117,68 @@ func (h *PinHandler) GetPins(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	WriteJSON(w, http.StatusOK, response)
+	httpx.WriteJSON(w, http.StatusOK, response)
 }
 
 func (h *PinHandler) UpdatePin(w http.ResponseWriter, r *http.Request) {
 	// Get id from url parameters
 	id := chi.URLParam(r, "id")
 
-	if !IsValidUUID(id) {
-		WriteJSONError(fmt.Errorf("update pin: %w", errBadRequest), w)
+	if !httpx.IsValidUUID(id) {
+		httpx.WriteJSONError(fmt.Errorf("update pin: %w", httpx.ErrBadRequest), w)
 		return
 	}
 
 	// Decode body
 	var pin UpdatePinRequest
-	if err := DecodeJSON(&pin, r); err != nil {
-		WriteJSONError(err, w)
+	if err := httpx.DecodeJSON(&pin, r); err != nil {
+		httpx.WriteJSONError(err, w)
 		return
 	}
 
 	// Security
 	claims, ok := middleware.GetUserClaims(r)
 	if !ok {
-		WriteJSONError(errUnauthorized, w)
+		httpx.WriteJSONError(httpx.ErrUnauthorized, w)
 		return
 	}
 
 	// Service call
 	err := h.service.UpdatePin(r.Context(), id, claims.UserID, pin)
 	if err != nil {
-		WriteJSONError(fmt.Errorf("update pin: %w", err), w)
+		httpx.WriteJSONError(fmt.Errorf("update pin: %w", err), w)
 		return
 	}
 
 	// Response writing
-	WriteJSON(w, 200, "Updated successfully")
+	httpx.WriteJSON(w, 200, "Updated successfully")
 }
 
 func (h *PinHandler) DeletePin(w http.ResponseWriter, r *http.Request) {
 	// Get id from url parameters
 	id := chi.URLParam(r, "id")
 
-	if !IsValidUUID(id) {
-		WriteJSONError(fmt.Errorf("delete pin: %w", errBadRequest), w)
+	if !httpx.IsValidUUID(id) {
+		httpx.WriteJSONError(fmt.Errorf("delete pin: %w", httpx.ErrBadRequest), w)
 		return
 	}
 
 	// Security
 	claims, ok := middleware.GetUserClaims(r)
 	if !ok {
-		WriteJSONError(errUnauthorized, w)
+		httpx.WriteJSONError(httpx.ErrUnauthorized, w)
 		return
 	}
 
 	// Service call
 	err := h.service.DeletePin(r.Context(), id, claims.UserID)
 	if err != nil {
-		WriteJSONError(fmt.Errorf("delete pin: %w", err), w)
+		httpx.WriteJSONError(fmt.Errorf("delete pin: %w", err), w)
 		return
 	}
 
 	// Response writing
-	WriteJSON(w, 200, "Deleted successfully")
+	httpx.WriteJSON(w, 200, "Deleted successfully")
 }
 
 // Health
@@ -234,7 +235,7 @@ func (f *PinFilters) Validate() error {
 		"":           true, // empty is allowed (will use default)
 	}
 	if !allowedSortFields[f.SortBy] {
-		valErr := errValidation{
+		valErr := httpx.ValidationError{
 			Details: map[string]string{
 				"invalid sort_by field": "Allowed: 'title', 'created_at', 'updated_at', 'likes' or empty",
 			},
@@ -244,7 +245,7 @@ func (f *PinFilters) Validate() error {
 
 	// Validate SortOrder
 	if f.SortOrder != "" && f.SortOrder != "asc" && f.SortOrder != "desc" {
-		valErr := errValidation{
+		valErr := httpx.ValidationError{
 			Details: map[string]string{
 				"invalid sort_order": "Must be 'asc', 'desc' or empty",
 			},

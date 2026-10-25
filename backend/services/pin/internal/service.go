@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/httpx"
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
@@ -52,7 +53,7 @@ func (s *pinService) CreatePin(ctx context.Context, userID uuid.UUID, pin Create
 	// Validate input
 	err := s.validate.Struct(pin)
 	if err != nil {
-		valErr := newValidationErr(getValidationMap(err))
+		valErr := httpx.NewValidationErr(httpx.ValidationMap(err))
 		return nil, fmt.Errorf("input validation: %w", valErr)
 	}
 
@@ -149,7 +150,7 @@ func (s *pinService) UpdatePin(ctx context.Context, id string, userID uuid.UUID,
 	// Validate input
 	err := s.validate.Struct(pin)
 	if err != nil {
-		valErr := newValidationErr(getValidationMap(err))
+		valErr := httpx.NewValidationErr(httpx.ValidationMap(err))
 		return fmt.Errorf("input validation: %w", valErr)
 	}
 
@@ -159,12 +160,12 @@ func (s *pinService) UpdatePin(ctx context.Context, id string, userID uuid.UUID,
 		return fmt.Errorf("get pin from repository: %w", err)
 	}
 	if existing.User_id != userID {
-		return fmt.Errorf("update pin: %w", errForbidden)
+		return fmt.Errorf("update pin: %w", httpx.ErrForbidden)
 	}
 
 	parsedID, err := uuid.Parse(id)
 	if err != nil {
-		return fmt.Errorf("parse id: %w", errBadRequest)
+		return fmt.Errorf("parse id: %w", httpx.ErrBadRequest)
 	}
 	pin.Id = parsedID
 
@@ -183,7 +184,7 @@ func (s *pinService) DeletePin(ctx context.Context, id string, userID uuid.UUID)
 		return fmt.Errorf("get pin from repository: %w", err)
 	}
 	if existing.User_id != userID {
-		return fmt.Errorf("delete pin: %w", errForbidden)
+		return fmt.Errorf("delete pin: %w", httpx.ErrForbidden)
 	}
 
 	// Repository call
@@ -207,7 +208,7 @@ func (s *pinService) ConfirmUpload(ctx context.Context, id string, userID uuid.U
 		return nil, fmt.Errorf("get pin from repository: %w", err)
 	}
 	if existing.User_id != userID {
-		return nil, fmt.Errorf("confirm upload: %w", errForbidden)
+		return nil, fmt.Errorf("confirm upload: %w", httpx.ErrForbidden)
 	}
 
 	// Idempotent

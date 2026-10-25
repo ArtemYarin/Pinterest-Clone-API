@@ -3,6 +3,7 @@ package pin
 import (
 	"testing"
 
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/httpx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -48,7 +49,7 @@ func TestPinFilters_Validate(t *testing.T) {
 			err := f.Validate()
 
 			if tt.wantErr {
-				var valErr *errValidation
+				var valErr *httpx.ValidationError
 				require.ErrorAs(t, err, &valErr)
 				return
 			}

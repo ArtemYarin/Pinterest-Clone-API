@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/httpx"
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/postgres"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -32,7 +34,7 @@ func (r *profileRepository) CreateProfile(ctx context.Context, userID uuid.UUID,
 		userID, username).
 		Scan(&p.UserID, &p.Username, &p.Bio, &p.AvatarKey, &p.AvatarStatus, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
-		if isNotFoundErr(err) {
+		if postgres.IsNotFoundErr(err) {
 			// ON CONFLICT DO NOTHING returned no row: profile already exists
 			// (e.g. a redelivered registration event) - treat as idempotent success.
 			return r.GetProfileByUserID(ctx, userID)
@@ -49,7 +51,7 @@ func (r *profileRepository) GetProfileByUserID(ctx context.Context, userID uuid.
 		userID).
 		Scan(&p.UserID, &p.Username, &p.Bio, &p.AvatarKey, &p.AvatarStatus, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
-		if isNotFoundErr(err) {
+		if postgres.IsNotFoundErr(err) {
 			return nil, fmt.Errorf("user_id %s not found: %w", userID, errProfileNotFound)
 		}
 		return nil, fmt.Errorf("GetProfileByUserID user %v: %v", userID, err)
@@ -73,7 +75,7 @@ func (r *profileRepository) UpdateProfile(ctx context.Context, userID uuid.UUID,
 		argIndex++
 	}
 	if len(args) == 0 {
-		return fmt.Errorf("no fields to update: %w", errBadRequest)
+		return fmt.Errorf("no fields to update: %w", httpx.ErrBadRequest)
 	}
 
 	query += fmt.Sprintf(" WHERE user_id = $%d", argIndex)

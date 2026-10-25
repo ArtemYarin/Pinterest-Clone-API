@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/httpx"
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/postgres"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -35,7 +37,7 @@ func (r *userRepository) CreateUser(ctx context.Context, user CredentialsUserReq
 		user.Email, user.Password_hash).
 		Scan(&u.Id, &u.Email, &u.Created_at, &u.Updated_at)
 	if err != nil {
-		if isDuplicateErr(err) {
+		if postgres.IsDuplicateErr(err) {
 			return nil, fmt.Errorf("email %v already exists: %w", user.Email, errEmailExists)
 		}
 		return nil, fmt.Errorf("CreateUser %v: %v", user, err)
@@ -49,7 +51,7 @@ func (r *userRepository) GetUserByEmail(ctx context.Context, email string) (*Use
 		"SELECT id, email, password_hash, created_at, updated_at FROM users WHERE email = $1", email).
 		Scan(&u.Id, &u.Email, &u.Password_hash, &u.Created_at, &u.Updated_at)
 	if err != nil {
-		if isNotFoundErr(err) {
+		if postgres.IsNotFoundErr(err) {
 			return nil, fmt.Errorf("email %s not found: %w", email, errUserNotFound)
 		}
 		return nil, fmt.Errorf("GetUserByEmail email %v: %v", email, err)
@@ -63,7 +65,7 @@ func (r *userRepository) GetUserByID(ctx context.Context, id string) (*UserRespo
 		"SELECT id, email, created_at, updated_at FROM users WHERE id = $1", id).
 		Scan(&u.Id, &u.Email, &u.Created_at, &u.Updated_at)
 	if err != nil {
-		if isNotFoundErr(err) {
+		if postgres.IsNotFoundErr(err) {
 			return nil, fmt.Errorf("id %s not found: %w", id, errUserNotFound)
 		}
 		return nil, fmt.Errorf("GetUserByID id %v: %v", id, err)
@@ -87,7 +89,7 @@ func (r *userRepository) UpdateUser(ctx context.Context, user UpdateUserRequest)
 		argIndex++
 	}
 	if len(args) == 0 {
-		return fmt.Errorf("no fields to update: %w", errBadRequest)
+		return fmt.Errorf("no fields to update: %w", httpx.ErrBadRequest)
 	}
 
 	query += fmt.Sprintf(" WHERE id = $%d", argIndex)
@@ -122,7 +124,7 @@ func (r *userRepository) FindRefreshToken(ctx context.Context, hash string) (*Re
 	).Scan(&t.ID, &t.UserID, &t.TokenHash, &t.ExpiresAt, &t.RevokedAt, &t.CreatedAt)
 
 	if err != nil {
-		if isNotFoundErr(err) {
+		if postgres.IsNotFoundErr(err) {
 			return nil, fmt.Errorf("refresh token not found: %w", errTokenNotFound)
 		}
 		return nil, fmt.Errorf("FindRefreshToken: %v", err)

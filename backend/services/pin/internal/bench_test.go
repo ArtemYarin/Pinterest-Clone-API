@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/httpx"
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -101,6 +102,6 @@ func BenchmarkWriteJSON(b *testing.B) {
 	b.ReportAllocs()
 
 	for b.Loop() {
-		WriteJSON(httptest.NewRecorder(), http.StatusOK, page)
+		httpx.WriteJSON(httptest.NewRecorder(), http.StatusOK, page)
 	}
 }

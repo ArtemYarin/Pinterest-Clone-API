@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/httpx"
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
@@ -90,7 +91,7 @@ func TestPinService_CreatePin(t *testing.T) {
 
 			switch {
 			case tt.wantValidationErr:
-				var valErr *errValidation
+				var valErr *httpx.ValidationError
 				require.ErrorAs(t, err, &valErr)
 				assert.Contains(t, valErr.Details, "Title")
 				assert.Nil(t, resp)
@@ -190,7 +191,7 @@ func TestPinService_UpdatePin(t *testing.T) {
 			setup: func(repo *mockPinRepository) {
 				repo.On("GetPinByID", mock.Anything, pinID.String()).Return(newTestPin(pinID, owner, "confirmed"), nil)
 			},
-			wantErr: errForbidden,
+			wantErr: httpx.ErrForbidden,
 		},
 		{
 			name:   "success",
@@ -214,7 +215,7 @@ func TestPinService_UpdatePin(t *testing.T) {
 
 			switch {
 			case tt.wantValidationErr:
-				var valErr *errValidation
+				var valErr *httpx.ValidationError
 				require.ErrorAs(t, err, &valErr)
 				assert.Contains(t, valErr.Details, "Title")
 			case tt.wantErr != nil:
@@ -242,7 +243,7 @@ func TestPinService_DeletePin(t *testing.T) {
 			setup: func(repo *mockPinRepository, store *mockImageStore) {
 				repo.On("GetPinByID", mock.Anything, pinID.String()).Return(newTestPin(pinID, owner, "confirmed"), nil)
 			},
-			wantErr: errForbidden,
+			wantErr: httpx.ErrForbidden,
 		},
 		{
 			// The DB row is the source of truth - a storage failure is only logged
@@ -307,7 +308,7 @@ func TestPinService_ConfirmUpload(t *testing.T) {
 			setup: func(repo *mockPinRepository, store *mockImageStore) {
 				pendingPin(repo)
 			},
-			wantErr: errForbidden,
+			wantErr: httpx.ErrForbidden,
 		},
 		{
 			name:   "already confirmed is idempotent",

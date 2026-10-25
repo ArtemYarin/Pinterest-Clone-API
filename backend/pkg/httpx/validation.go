@@ -1,4 +1,4 @@
-package pin
+package httpx
 
 import (
 	"fmt"
@@ -12,11 +12,24 @@ func IsValidUUID(s string) bool {
 	return err == nil
 }
 
+// ValidationMap converts validator errors into a field -> message map
+func ValidationMap(err error) map[string]string {
+	errorsMap := make(map[string]string)
+	if validationErrors, ok := err.(validator.ValidationErrors); ok {
+		for _, ve := range validationErrors {
+			errorsMap[ve.Field()] = formatValidationError(ve)
+		}
+	}
+	return errorsMap
+}
+
 // Helpers
 func formatValidationError(err validator.FieldError) string {
 	switch err.Tag() {
 	case "required":
 		return fmt.Sprintf("%s is required", err.Field())
+	case "email":
+		return fmt.Sprintf("%s must be a valid email address", err.Field())
 	case "url":
 		return fmt.Sprintf("%s must be a valid URL", err.Field())
 	case "min":
@@ -26,14 +39,4 @@ func formatValidationError(err validator.FieldError) string {
 	default:
 		return fmt.Sprintf("%s is invalid", err.Field())
 	}
-}
-
-func getValidationMap(err error) map[string]string {
-	errorsMap := make(map[string]string)
-	if validationErrors, ok := err.(validator.ValidationErrors); ok {
-		for _, ve := range validationErrors {
-			errorsMap[ve.Field()] = formatValidationError(ve)
-		}
-	}
-	return errorsMap
 }

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/httpx"
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 )
@@ -57,8 +58,8 @@ func (s *profileService) CreateFromRegistration(ctx context.Context, userID uuid
 }
 
 func (s *profileService) GetProfile(ctx context.Context, userID string) (*ProfileResponse, error) {
-	if !IsValidUUID(userID) {
-		return nil, fmt.Errorf("get profile: %w", errBadRequest)
+	if !httpx.IsValidUUID(userID) {
+		return nil, fmt.Errorf("get profile: %w", httpx.ErrBadRequest)
 	}
 	parsedID, _ := uuid.Parse(userID)
 
@@ -88,7 +89,7 @@ func (s *profileService) GetProfile(ctx context.Context, userID string) (*Profil
 func (s *profileService) UpdateProfile(ctx context.Context, userID uuid.UUID, req UpdateProfileRequest) error {
 	err := s.validate.Struct(req)
 	if err != nil {
-		valErr := newValidationErr(getValidationMap(err))
+		valErr := httpx.NewValidationErr(httpx.ValidationMap(err))
 		return fmt.Errorf("input validation: %w", valErr)
 	}
 
@@ -99,7 +100,7 @@ func (s *profileService) UpdateProfile(ctx context.Context, userID uuid.UUID, re
 	}
 
 	if req.Username == nil && req.Bio == nil {
-		return fmt.Errorf("no fields to update: %w", errBadRequest)
+		return fmt.Errorf("no fields to update: %w", httpx.ErrBadRequest)
 	}
 
 	if err := s.repo.UpdateProfile(ctx, userID, req.Username, req.Bio); err != nil {
@@ -133,7 +134,7 @@ func (s *profileService) ConfirmAvatarUpload(ctx context.Context, userID uuid.UU
 		return nil, fmt.Errorf("get profile from repository: %w", err)
 	}
 	if p.AvatarKey == nil {
-		return nil, fmt.Errorf("confirm avatar: no pending upload: %w", errBadRequest)
+		return nil, fmt.Errorf("confirm avatar: no pending upload: %w", httpx.ErrBadRequest)
 	}
 
 	// Idempotent

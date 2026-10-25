@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/httpx"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
@@ -166,7 +167,7 @@ func TestPinRepository_Errors(t *testing.T) {
 		{
 			name:    "update without fields",
 			run:     func() error { return repo.UpdatePin(ctx, UpdatePinRequest{Id: existing.Id}) },
-			wantErr: errBadRequest,
+			wantErr: httpx.ErrBadRequest,
 		},
 		{
 			name:    "delete missing pin",

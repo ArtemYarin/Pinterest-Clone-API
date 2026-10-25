@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/httpx"
 	"github.com/ArtemYarin/pinterest-clone-api/pkg/jwt"
 	"github.com/ArtemYarin/pinterest-clone-api/pkg/rabbitmq"
 	"github.com/ArtemYarin/pinterest-clone-api/services/auth-service/internal/password"
@@ -51,7 +52,7 @@ func (s *userService) RegisterUser(ctx context.Context, user CredentialsUserRequ
 	// Validate input
 	err := s.validate.Struct(user)
 	if err != nil {
-		valErr := newValidationErr(getValidationMap(err))
+		valErr := httpx.NewValidationErr(httpx.ValidationMap(err))
 		return nil, fmt.Errorf("input validation: %w", valErr)
 	}
 
@@ -115,7 +116,7 @@ func (s *userService) LoginUser(ctx context.Context, user CredentialsUserRequest
 	// Validate input
 	err := s.validate.Struct(user)
 	if err != nil {
-		valErr := newValidationErr(getValidationMap(err))
+		valErr := httpx.NewValidationErr(httpx.ValidationMap(err))
 		return nil, fmt.Errorf("service LoginUser: %w", valErr)
 	}
 
@@ -127,7 +128,7 @@ func (s *userService) LoginUser(ctx context.Context, user CredentialsUserRequest
 
 	// Password validation
 	if err := password.CheckPassword(storedUser.Password_hash, user.Password_hash); err != nil {
-		return nil, fmt.Errorf("compare password: %w", errUnauthorized)
+		return nil, fmt.Errorf("compare password: %w", httpx.ErrUnauthorized)
 	}
 
 	// Token
@@ -178,7 +179,7 @@ func (s *userService) UpdateUser(ctx context.Context, user UpdateUserRequest) er
 	// Validate input
 	err := s.validate.Struct(user)
 	if err != nil {
-		valErr := newValidationErr(getValidationMap(err))
+		valErr := httpx.NewValidationErr(httpx.ValidationMap(err))
 		return fmt.Errorf("service UpdateUser: %w", valErr)
 	}
 
