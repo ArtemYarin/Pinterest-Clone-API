@@ -93,6 +93,8 @@ func (s *ImageStorage) GenerateDownloadURL(ctx context.Context, objectKey string
 	return url.String(), nil
 }
 
+// StatObject verifies if object exists, you have permission
+// to access it and returns information about the object.
 func (s *ImageStorage) StatObject(ctx context.Context, objectKey string) (minio.ObjectInfo, error) {
 	return s.client.StatObject(ctx, s.bucket, objectKey, minio.StatObjectOptions{})
 }

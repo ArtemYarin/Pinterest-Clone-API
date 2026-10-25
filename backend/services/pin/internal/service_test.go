@@ -29,7 +29,7 @@ func newTestService(t *testing.T) (*pinService, *mockPinRepository, *mockImageSt
 		repo.AssertExpectations(t)
 		store.AssertExpectations(t)
 	})
-	return &pinService{repo: repo, validate: validator.New(), imgStorage: store}, repo, store
+	return &pinService{repo: repo, validate: validator.New(), imgStorage: store, cache: noopPinCache{}}, repo, store
 }
 
 func newTestPin(id, owner uuid.UUID, status string) *PinResponse {

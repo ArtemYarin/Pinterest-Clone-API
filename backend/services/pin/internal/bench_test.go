@@ -80,7 +80,7 @@ func BenchmarkPinService_GetPins(b *testing.B) {
 
 	for _, n := range []int{20, 100} {
 		b.Run(fmt.Sprintf("pins=%d", n), func(b *testing.B) {
-			svc := NewPinService(&stubPinRepository{pins: makeTestPins(n)}, nil, storage)
+			svc := NewPinService(&stubPinRepository{pins: makeTestPins(n)}, nil, storage, noopPinCache{})
 			ctx := context.Background()
 			b.ReportAllocs()
 

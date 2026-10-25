@@ -19,6 +19,7 @@ import (
 	pingrpc "github.com/ArtemYarin/pinterest-clone-api/services/pin-service/internal/grpc"
 	"github.com/go-playground/validator/v10"
 	"github.com/joho/godotenv"
+	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 )
 
@@ -79,6 +80,22 @@ func main() {
 		log.Fatalf("Failed to set Garage bucket CORS: %v", err)
 	}
 
+	// Redis cache
+	redisClient := redis.NewClient(&redis.Options{
+		Addr:     os.Getenv("REDIS_ADDR"),
+		Password: os.Getenv("REDIS_PASSWORD"),
+	})
+	defer redisClient.Close()
+	if err := redisClient.Ping(ctx).Err(); err != nil {
+		log.Fatalf("Failed to connect to Redis: %v", err)
+	}
+	log.Println("Connected to Redis successfully")
+	pinCache := pin.NewRedisPinCache(
+		redisClient,
+		pin.GetDurationEnv("PIN_CACHE_TTL", 5*time.Minute),
+		pin.GetDurationEnv("PIN_CACHE_LIST_TTL", time.Minute),
+	)
+
 	// Wiring
 	pinRepo := pin.NewPinRepository(pool)
 
@@ -93,7 +110,7 @@ func main() {
 	defer cleanupWorker.Stop()
 	log.Println("Started pin cleanup worker successfully")
 
-	pinService := pin.NewPinService(pinRepo, validate, miniO)
+	pinService := pin.NewPinService(pinRepo, validate, miniO, pinCache)
 	pinHandler := pin.NewPinHandler(pinService)
 
 	r := pin.PinRouter(&pinHandler, pool, miniO, jm)

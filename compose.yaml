@@ -104,6 +104,22 @@ services:
       retries: 5
       start_period: 10s
 
+  redis-pin:
+    image: redis:8.8-alpine
+    container_name: redis_pin
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    environment:
+      REDISCLI_AUTH: ${PIN_REDIS_PASSWORD}
+    # Pure cache: no persistence, evict least recently used keys when full
+    command: redis-server --requirepass "${PIN_REDIS_PASSWORD}" --save "" --appendonly no --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   garage:
     image: dxflrs/garage:v2.3.0
     container_name: garage
@@ -146,6 +162,8 @@ services:
         condition: service_completed_successfully
       garage:
         condition: service_healthy
+      redis-pin:
+        condition: service_healthy
     environment:
       JWT_SECRET: ${JWT_SECRET}
       PIN_PORT: ${PIN_PORT}
@@ -165,6 +183,10 @@ services:
       PIN_CLEANUP_INTERVAL: ${PIN_CLEANUP_INTERVAL}
       PIN_CLEANUP_TTL: ${PIN_CLEANUP_TTL}
       PIN_CLEANUP_BATCH_SIZE: ${PIN_CLEANUP_BATCH_SIZE}
+      REDIS_ADDR: ${PIN_REDIS_ADDR}
+      REDIS_PASSWORD: ${PIN_REDIS_PASSWORD}
+      PIN_CACHE_TTL: ${PIN_CACHE_TTL}
+      PIN_CACHE_LIST_TTL: ${PIN_CACHE_LIST_TTL}
     ports:
       - "8082:8080"
 

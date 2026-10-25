@@ -43,10 +43,11 @@ type pinService struct {
 	repo       PinRepository
 	validate   *validator.Validate
 	imgStorage ImageStore
+	cache      PinCache
 }
 
-func NewPinService(repo PinRepository, validate *validator.Validate, imgStorage ImageStore) PinService {
-	return &pinService{repo: repo, validate: validate, imgStorage: imgStorage}
+func NewPinService(repo PinRepository, validate *validator.Validate, imgStorage ImageStore, cache PinCache) PinService {
+	return &pinService{repo: repo, validate: validate, imgStorage: imgStorage, cache: cache}
 }
 
 func (s *pinService) CreatePin(ctx context.Context, userID uuid.UUID, pin CreatePinRequest) (*UploadImgPinResponse, error) {
@@ -80,14 +81,23 @@ func (s *pinService) CreatePin(ctx context.Context, userID uuid.UUID, pin Create
 }
 
 func (s *pinService) GetPinByID(ctx context.Context, id string) (*DownloadImgPinResponse, error) {
-	// Get pin fron repository
-	pin, err := s.repo.GetPinByID(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("get pin from repository: %w", err)
+	// Get pin from cache, falling back to repository
+	pin, ok := s.cache.GetPin(ctx, id)
+	if !ok {
+		var err error
+		pin, err = s.repo.GetPinByID(ctx, id)
+		if err != nil {
+			return nil, fmt.Errorf("get pin from repository: %w", err)
+		}
+		// Pending pins are about to change status, so caching them would hide the confirmed upload
+		if pin.Image_status == "confirmed" {
+			s.cache.SetPin(ctx, pin)
+		}
 	}
 
 	// Download link - only for confirmed uploads, otherwise the object may not exist yet
 	var downloadURL string
+	var err error
 	if pin.Image_status == "confirmed" {
 		downloadURL, err = s.imgStorage.GenerateDownloadURL(ctx, pin.Image_url, 1*time.Hour)
 		if err != nil {
@@ -101,9 +111,14 @@ func (s *pinService) GetPinByID(ctx context.Context, id string) (*DownloadImgPin
 }
 
 func (s *pinService) GetPins(ctx context.Context, filters PinFilters) ([]DownloadImgPinResponse, int, error) {
-	pins, count, err := s.repo.GetPins(ctx, filters)
-	if err != nil {
-		return nil, 0, fmt.Errorf("get pins from repository: %w", err)
+	pins, count, ok := s.cache.GetPins(ctx, filters)
+	if !ok {
+		var err error
+		pins, count, err = s.repo.GetPins(ctx, filters)
+		if err != nil {
+			return nil, 0, fmt.Errorf("get pins from repository: %w", err)
+		}
+		s.cache.SetPins(ctx, filters, pins, count)
 	}
 
 	var resp []DownloadImgPinResponse
