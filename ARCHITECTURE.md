@@ -48,7 +48,7 @@ flowchart LR
 | --------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | **gateway**     | Single entry point; proxies to the services and composes cross-service endpoints | chi, `httputil.ReverseProxy`, gRPC clients, embedded OpenAPI |
 | **auth**        | Signup, login, JWT access tokens, rotating refresh tokens                        | bcrypt, HttpOnly cookies, RabbitMQ publisher                 |
-| **pin**         | Pin CRUD, presigned uploads, cleanup of abandoned uploads                        | minio-go on Garage S3, gRPC server                           |
+| **pin**         | Pin CRUD, presigned uploads, cleanup of abandoned uploads, cache                 | minio-go on Garage S3, gRPC server, redis                    |
 | **interaction** | Likes and like counts                                                            | Transactional like counter, gRPC server                      |
 | **profile**     | User profiles and avatars                                                        | RabbitMQ consumer, presigned uploads                         |
 

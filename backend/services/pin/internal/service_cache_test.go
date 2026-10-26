@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ArtemYarin/pinterest-clone-api/pkg/httpx"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -52,12 +53,34 @@ func TestPinService_GetPinByID_Cache(t *testing.T) {
 		assert.False(t, mr.Exists(pinKey(pinID.String())))
 	})
 
-	t.Run("not found is not cached", func(t *testing.T) {
+	t.Run("not found is cached", func(t *testing.T) {
 		svc, repo, _, mr := newTestServiceWithCache(t)
 		repo.On("GetPinByID", mock.Anything, pinID.String()).Return(nil, errPinNotFound).Once()
 
+		for range 2 {
+			_, err := svc.GetPinByID(ctx, pinID.String())
+			require.ErrorIs(t, err, errPinNotFound)
+		}
+		assert.Equal(t, testNotFoundTTL, mr.TTL(pinKey(pinID.String())))
+	})
+
+	t.Run("not found refetches after ttl", func(t *testing.T) {
+		svc, repo, _, mr := newTestServiceWithCache(t)
+		repo.On("GetPinByID", mock.Anything, pinID.String()).Return(nil, errPinNotFound).Twice()
+
 		_, err := svc.GetPinByID(ctx, pinID.String())
 		require.ErrorIs(t, err, errPinNotFound)
+		mr.FastForward(testNotFoundTTL)
+		_, err = svc.GetPinByID(ctx, pinID.String())
+		require.ErrorIs(t, err, errPinNotFound)
+	})
+
+	t.Run("other repository errors are not cached", func(t *testing.T) {
+		svc, repo, _, mr := newTestServiceWithCache(t)
+		repo.On("GetPinByID", mock.Anything, pinID.String()).Return(nil, httpx.ErrInternalServer).Once()
+
+		_, err := svc.GetPinByID(ctx, pinID.String())
+		require.ErrorIs(t, err, httpx.ErrInternalServer)
 		assert.Empty(t, mr.Keys())
 	})
 
@@ -153,4 +176,66 @@ func TestPinService_GetPins_Cache(t *testing.T) {
 		assert.Equal(t, len(pins), count)
 		assert.Len(t, resp, len(pins))
 	})
+}
+
+func TestPinService_InvalidatesPinOnWrite(t *testing.T) {
+	ctx := context.Background()
+	pinID := uuid.New()
+	owner := uuid.New()
+	id := pinID.String()
+	title := "New title"
+
+	tests := []struct {
+		name    string
+		setup   func(repo *mockPinRepository, store *mockImageStore, p *PinResponse)
+		write   func(svc *pinService) error
+		wantErr error
+	}{
+		{
+			name: "update",
+			setup: func(repo *mockPinRepository, _ *mockImageStore, _ *PinResponse) {
+				repo.On("UpdatePin", mock.Anything, UpdatePinRequest{Id: pinID, Title: &title}).Return(nil).Once()
+			},
+			write: func(svc *pinService) error {
+				return svc.UpdatePin(ctx, id, owner, UpdatePinRequest{Title: &title})
+			},
+		},
+		{
+			name: "delete",
+			setup: func(repo *mockPinRepository, store *mockImageStore, p *PinResponse) {
+				repo.On("DeletePin", mock.Anything, id).Return(nil).Once()
+				store.On("RemoveObject", mock.Anything, p.Image_url).Return(nil).Once()
+			},
+			write: func(svc *pinService) error {
+				return svc.DeletePin(ctx, id, owner)
+			},
+		},
+		{
+			name:    "forbidden update keeps the entry",
+			setup:   func(*mockPinRepository, *mockImageStore, *PinResponse) {},
+			wantErr: httpx.ErrForbidden,
+			write: func(svc *pinService) error {
+				return svc.UpdatePin(ctx, id, uuid.New(), UpdatePinRequest{Title: &title})
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc, repo, store, mr := newTestServiceWithCache(t)
+			p := newTestPin(pinID, owner, "confirmed")
+			repo.On("GetPinByID", mock.Anything, id).Return(p, nil).Once()
+			tt.setup(repo, store, p)
+			svc.cache.SetPin(ctx, p)
+
+			err := tt.write(svc)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				assert.True(t, mr.Exists(pinKey(id)))
+				return
+			}
+			require.NoError(t, err)
+			assert.False(t, mr.Exists(pinKey(id)))
+		})
+	}
 }

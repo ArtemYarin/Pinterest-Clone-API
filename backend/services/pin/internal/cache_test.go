@@ -14,8 +14,9 @@ import (
 )
 
 const (
-	testPinTTL  = 5 * time.Minute
-	testListTTL = time.Minute
+	testPinTTL      = 5 * time.Minute
+	testListTTL     = time.Minute
+	testNotFoundTTL = 30 * time.Second
 )
 
 func newTestCache(t *testing.T) (PinCache, *miniredis.Miniredis) {
@@ -23,7 +24,7 @@ func newTestCache(t *testing.T) (PinCache, *miniredis.Miniredis) {
 	mr := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	t.Cleanup(func() { client.Close() })
-	return NewRedisPinCache(client, testPinTTL, testListTTL), mr
+	return NewRedisPinCache(client, testPinTTL, testListTTL, testNotFoundTTL), mr
 }
 
 func TestPinCache_Pin(t *testing.T) {
@@ -70,6 +71,50 @@ func TestPinCache_Pin(t *testing.T) {
 
 		_, ok := cache.GetPin(ctx, p.Id.String())
 		assert.False(t, ok)
+	})
+
+	t.Run("not found round trip", func(t *testing.T) {
+		cache, mr := newTestCache(t)
+		cache.SetPinNotFound(ctx, p.Id.String())
+
+		got, ok := cache.GetPin(ctx, p.Id.String())
+		assert.True(t, ok)
+		assert.Nil(t, got)
+		assert.Equal(t, testNotFoundTTL, mr.TTL(pinKey(p.Id.String())))
+	})
+
+	t.Run("not found expires after ttl", func(t *testing.T) {
+		cache, mr := newTestCache(t)
+		cache.SetPinNotFound(ctx, p.Id.String())
+		mr.FastForward(testNotFoundTTL)
+
+		_, ok := cache.GetPin(ctx, p.Id.String())
+		assert.False(t, ok)
+	})
+
+	t.Run("set overwrites not found", func(t *testing.T) {
+		cache, _ := newTestCache(t)
+		cache.SetPinNotFound(ctx, p.Id.String())
+		cache.SetPin(ctx, p)
+
+		got, ok := cache.GetPin(ctx, p.Id.String())
+		require.True(t, ok)
+		assert.Equal(t, p, got)
+	})
+
+	t.Run("delete", func(t *testing.T) {
+		cache, mr := newTestCache(t)
+		cache.SetPin(ctx, p)
+		cache.DeletePin(ctx, strings.ToUpper(p.Id.String()))
+
+		assert.False(t, mr.Exists(pinKey(p.Id.String())))
+		_, ok := cache.GetPin(ctx, p.Id.String())
+		assert.False(t, ok)
+	})
+
+	t.Run("delete missing key is harmless", func(t *testing.T) {
+		cache, _ := newTestCache(t)
+		assert.NotPanics(t, func() { cache.DeletePin(ctx, p.Id.String()) })
 	})
 }
 
@@ -129,6 +174,8 @@ func TestPinCache_RedisDown(t *testing.T) {
 
 	assert.NotPanics(t, func() {
 		cache.SetPin(ctx, p)
+		cache.SetPinNotFound(ctx, p.Id.String())
+		cache.DeletePin(ctx, p.Id.String())
 		cache.SetPins(ctx, PinFilters{}, []PinResponse{*p}, 1)
 	})
 	_, ok := cache.GetPin(ctx, p.Id.String())
@@ -144,6 +191,8 @@ func TestNoopPinCache(t *testing.T) {
 
 	// Writes are dropped, so lookups miss even right after a set
 	cache.SetPin(ctx, p)
+	cache.SetPinNotFound(ctx, p.Id.String())
+	cache.DeletePin(ctx, p.Id.String())
 	cache.SetPins(ctx, PinFilters{}, []PinResponse{*p}, 1)
 	_, ok := cache.GetPin(ctx, p.Id.String())
 	assert.False(t, ok)

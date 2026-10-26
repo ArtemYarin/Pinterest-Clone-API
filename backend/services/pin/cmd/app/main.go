@@ -94,6 +94,7 @@ func main() {
 		redisClient,
 		pin.GetDurationEnv("PIN_CACHE_TTL", 5*time.Minute),
 		pin.GetDurationEnv("PIN_CACHE_LIST_TTL", time.Minute),
+		pin.GetDurationEnv("PIN_CACHE_NOT_FOUND_TTL", 30*time.Second),
 	)
 
 	// Wiring

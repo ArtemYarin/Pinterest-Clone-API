@@ -15,17 +15,26 @@ import (
 
 // PinCache is a read-through cache for pin metadata. It stores repository data only -
 // presigned download URLs are generated per request so they never outlive their expiry.
+// Single pins are invalidated on write; lists are not and rely on a short TTL instead.
 type PinCache interface {
+	// GetPin reports a hit with a nil pin when the id is cached as not found
 	GetPin(ctx context.Context, id string) (*PinResponse, bool)
 	SetPin(ctx context.Context, pin *PinResponse)
+	SetPinNotFound(ctx context.Context, id string)
+	DeletePin(ctx context.Context, id string)
 	GetPins(ctx context.Context, filters PinFilters) ([]PinResponse, int, bool)
 	SetPins(ctx context.Context, filters PinFilters, pins []PinResponse, count int)
 }
 
+// notFoundMarker is stored in place of a pin to cache a miss. It isn't valid JSON,
+// so it can never collide with an encoded pin.
+const notFoundMarker = "\x00notfound"
+
 type redisPinCache struct {
-	client  *redis.Client
-	pinTTL  time.Duration
-	listTTL time.Duration
+	client      *redis.Client
+	pinTTL      time.Duration
+	listTTL     time.Duration
+	notFoundTTL time.Duration
 }
 
 type cachedPinList struct {
@@ -33,13 +42,21 @@ type cachedPinList struct {
 	Count int           `json:"count"`
 }
 
-func NewRedisPinCache(client *redis.Client, pinTTL, listTTL time.Duration) PinCache {
-	return &redisPinCache{client: client, pinTTL: pinTTL, listTTL: listTTL}
+func NewRedisPinCache(client *redis.Client, pinTTL, listTTL, notFoundTTL time.Duration) PinCache {
+	return &redisPinCache{client: client, pinTTL: pinTTL, listTTL: listTTL, notFoundTTL: notFoundTTL}
 }
 
 func (c *redisPinCache) GetPin(ctx context.Context, id string) (*PinResponse, bool) {
+	key := pinKey(id)
+	data, ok := c.getRaw(ctx, key)
+	if !ok {
+		return nil, false
+	}
+	if string(data) == notFoundMarker {
+		return nil, true
+	}
 	var p PinResponse
-	if !c.get(ctx, pinKey(id), &p) {
+	if !c.decode(key, data, &p) {
 		return nil, false
 	}
 	return &p, true
@@ -47,6 +64,21 @@ func (c *redisPinCache) GetPin(ctx context.Context, id string) (*PinResponse, bo
 
 func (c *redisPinCache) SetPin(ctx context.Context, pin *PinResponse) {
 	c.set(ctx, pinKey(pin.Id.String()), pin, c.pinTTL)
+}
+
+func (c *redisPinCache) SetPinNotFound(ctx context.Context, id string) {
+	key := pinKey(id)
+	if err := c.client.Set(ctx, key, notFoundMarker, c.notFoundTTL).Err(); err != nil {
+		log.Printf("pin cache set %s: %v", key, err)
+	}
+}
+
+// DeletePin fails open: if the delete fails the entry stays stale until its TTL expires
+func (c *redisPinCache) DeletePin(ctx context.Context, id string) {
+	key := pinKey(id)
+	if err := c.client.Del(ctx, key).Err(); err != nil {
+		log.Printf("pin cache delete %s: %v", key, err)
+	}
 }
 
 func (c *redisPinCache) GetPins(ctx context.Context, filters PinFilters) ([]PinResponse, int, bool) {
@@ -73,13 +105,22 @@ func (c *redisPinCache) SetPins(ctx context.Context, filters PinFilters, pins []
 
 // get fails open: any Redis or decoding error is treated as a miss so reads fall back to the DB
 func (c *redisPinCache) get(ctx context.Context, key string, dst any) bool {
+	data, ok := c.getRaw(ctx, key)
+	return ok && c.decode(key, data, dst)
+}
+
+func (c *redisPinCache) getRaw(ctx context.Context, key string) ([]byte, bool) {
 	data, err := c.client.Get(ctx, key).Bytes()
 	if err != nil {
 		if !errors.Is(err, redis.Nil) {
 			log.Printf("pin cache get %s: %v", key, err)
 		}
-		return false
+		return nil, false
 	}
+	return data, true
+}
+
+func (c *redisPinCache) decode(key string, data []byte, dst any) bool {
 	if err := json.Unmarshal(data, dst); err != nil {
 		log.Printf("pin cache decode %s: %v", key, err)
 		return false
@@ -118,6 +159,8 @@ type noopPinCache struct{}
 
 func (noopPinCache) GetPin(context.Context, string) (*PinResponse, bool) { return nil, false }
 func (noopPinCache) SetPin(context.Context, *PinResponse)                {}
+func (noopPinCache) SetPinNotFound(context.Context, string)              {}
+func (noopPinCache) DeletePin(context.Context, string)                   {}
 func (noopPinCache) GetPins(context.Context, PinFilters) ([]PinResponse, int, bool) {
 	return nil, 0, false
 }

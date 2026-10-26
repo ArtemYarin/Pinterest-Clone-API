@@ -2,6 +2,7 @@ package pin
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -83,10 +84,17 @@ func (s *pinService) CreatePin(ctx context.Context, userID uuid.UUID, pin Create
 func (s *pinService) GetPinByID(ctx context.Context, id string) (*DownloadImgPinResponse, error) {
 	// Get pin from cache, falling back to repository
 	pin, ok := s.cache.GetPin(ctx, id)
+	if ok && pin == nil {
+		return nil, fmt.Errorf("get pin from cache: id %s not found: %w", id, errPinNotFound)
+	}
 	if !ok {
 		var err error
 		pin, err = s.repo.GetPinByID(ctx, id)
 		if err != nil {
+			// Repeated lookups of a missing id don't hit the DB
+			if errors.Is(err, errPinNotFound) {
+				s.cache.SetPinNotFound(ctx, id)
+			}
 			return nil, fmt.Errorf("get pin from repository: %w", err)
 		}
 		// Pending pins are about to change status, so caching them would hide the confirmed upload
@@ -189,6 +197,7 @@ func (s *pinService) UpdatePin(ctx context.Context, id string, userID uuid.UUID,
 	if err != nil {
 		return fmt.Errorf("update pin in repository: %w", err)
 	}
+	s.cache.DeletePin(ctx, id)
 	return nil
 }
 
@@ -207,6 +216,7 @@ func (s *pinService) DeletePin(ctx context.Context, id string, userID uuid.UUID)
 	if err != nil {
 		return fmt.Errorf("delete pin in repository: %w", err)
 	}
+	s.cache.DeletePin(ctx, id)
 
 	// Best-effort cleanup - the DB row is already gone, so a storage failure here shouldn't fail the request
 	if err := s.imgStorage.RemoveObject(ctx, existing.Image_url); err != nil {
